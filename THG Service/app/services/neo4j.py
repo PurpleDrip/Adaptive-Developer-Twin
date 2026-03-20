@@ -1,5 +1,4 @@
 from neo4j import AsyncGraphDatabase
-from contextlib import asynccontextmanager
 from app.config.settings import settings
 from typing import AsyncGenerator
 
@@ -12,7 +11,6 @@ async def init_neo4j():
         auth=(settings.neo4j_user, settings.neo4j_password)
     )
 
-@asynccontextmanager
 async def get_neo4j_session() -> AsyncGenerator:
     if not _driver:
         raise Exception("Neo4j driver not initialized")
