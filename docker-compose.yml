@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  telemetry-service:
+    build: ./telemetry-service
+    ports: ["8001:8000"]
+  
+  fusion-service:
+    build: ./fusion-service  
+    ports: ["8002:8000"]
+    
+  thg-service:
+    build: ./thg-service
+    ports: ["8003:8000"]
+    
