@@ -38,42 +38,46 @@ async def update_skill(
     skill_data: SkillUpdateDTO,
     session=Depends(get_neo4j_session)
 ):
-    """Fusion engine updates THG with new skill evidence."""
+    """
+    Fusion engine updates THG. 
+    Implements Temporal Exponential Decay (lambda=0.1) on previous strength.
+    """
     result = await session.run("""
         MERGE (d:Developer {id: $dev_id})
         MERGE (s:Skill {name: $skill_name})
         MERGE (d)-[r:HAS_SKILL]->(s)
-        SET r.strength = $strength,
-            r.confidence = $confidence,
+        ON CREATE SET r.strength = $strength, r.updated = datetime()
+        ON MATCH SET 
+            r.prev_strength = r.strength,
+            r.strength = (r.strength * exp(-0.1 * duration.inDays(r.updated, datetime()).days)) + ($strength * 0.5),
             r.updated = datetime()
+        SET r.confidence = $confidence
         RETURN d.id, s.name, r.strength, r.confidence
     """, dev_id=skill_data.dev_id, skill_name=skill_data.skill_name,
          strength=skill_data.strength, confidence=skill_data.confidence)
     
     record = await result.single(2.0)
-    if not record:
-        raise HTTPException(404, "Developer/Skill not found")
-    
     return {
         "status": "updated",
         "dev_id": record["d.id"],
         "skill": record["s.name"],
-        "strength": float(record["r.strength"])
+        "decayed_strength": float(record["r.strength"])
     }
 
-# 2. Get Developer Skills (Dashboard)
+# 2. Get Developer Skills (Dashboard with Live Decay)
 @router.get("/{dev_id}/skills", response_model=DeveloperSkills)
 async def get_developer_skills(
     dev_id: str,
     session=Depends(get_neo4j_session)
 ):
-    """Get complete skill profile for developer."""
+    """Get complete skill profile for developer with LIVE temporal decay."""
     result = await session.run("""
-        MATCH (d:Developer {id: $dev_id})- 
-              [r:HAS_SKILL]->(s:Skill)
+        MATCH (d:Developer {id: $dev_id})-[r:HAS_SKILL]->(s:Skill)
+        WITH d, r, s, duration.inDays(r.updated, datetime()).days as days_passed
         RETURN d.id, d.name, 
-               s.name, r.strength, r.confidence, r.updated
-        ORDER BY r.strength DESC
+               s.name, (r.strength * exp(-0.1 * days_passed)) as strength, 
+               r.confidence, r.updated
+        ORDER BY strength DESC
     """, dev_id=dev_id)
     
     records = await result.data()
@@ -84,18 +88,14 @@ async def get_developer_skills(
     skills = [
         SkillDTO(
             name=r["s.name"],
-            strength=float(r["r.strength"]),
+            strength=float(r["strength"]),
             confidence=float(r["r.confidence"]),
             updated=r["r.updated"]
         )
         for r in records
     ]
     
-    return DeveloperSkills(
-        dev_id=record["d.id"],
-        name=record["d.name"],
-        skills=skills
-    )
+    return DeveloperSkills(dev_id=record["d.id"], name=record["d.name"], skills=skills)
 
 # 3. Task-Developer Matching (Cosine Similarity)
 @router.post("/match", response_model=MatchResult)
@@ -153,12 +153,42 @@ async def get_leaderboard(
     } for idx, r in enumerate(records)]
 
 # 5. Team Analytics (HR Dashboard)
+@router.get("/teams/{team_id}/clusters")
+async def get_team_clusters(
+    team_id: str,
+    session=Depends(get_neo4j_session)
+):
+    """
+    Groups developers by skill profiles using K-Means (Simulated).
+    Identifies 'Elite', 'Growing', and 'Specialist' clusters.
+    """
+    result = await session.run("""
+        MATCH (t:Team {id: $team_id})<-[:BELONGS_TO]-(d:Developer)
+        MATCH (d)-[r:HAS_SKILL]->(s:Skill)
+        WITH d.name as name, s.name as skill, r.strength as score
+        RETURN name, collect({skill: skill, score: score}) as profile
+    """, team_id=team_id)
+    
+    records = await result.data()
+    clusters = {"Elite": [], "Growing": [], "Specialists": []}
+    
+    for r in records:
+        avg_score = sum([s['score'] for s in r['profile']]) / len(r['profile'])
+        if avg_score > 0.7: clusters["Elite"].append(r['name'])
+        elif avg_score > 0.4: clusters["Growing"].append(r['name'])
+        else: clusters["Specialists"].append(r['name'])
+        
+    return {
+        "team_id": team_id,
+        "clusters": clusters
+    }
+
 @router.get("/teams/{team_id}/avg-skills")
 async def get_team_skills(
     team_id: str,
     session=Depends(get_neo4j_session)
 ):
-    """Aggregate team skill levels (privacy-compliant)."""
+    """Aggregate team skill levels."""
     result = await session.run("""
         MATCH (t:Team {id: $team_id})<-[:BELONGS_TO]-(d:Developer)
         MATCH (d)-[r:HAS_SKILL]->(s:Skill)

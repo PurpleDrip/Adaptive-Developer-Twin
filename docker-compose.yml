@@ -65,3 +65,10 @@ services:
       TELEMETRY_URL: http://telemetry-service:8000
       FUSION_URL: http://fusion-service:8000
       THG_URL: http://thg-service:8000
+
+  dashboard-service:
+    build: ./Dashboard-Service
+    ports:
+      - "80:8000"
+    depends_on:
+      - gateway-service

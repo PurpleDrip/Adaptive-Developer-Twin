@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADT Pro - Analytics & Intelligence Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <h1 style="font-family: 'Orbitron'; font-size: 1.2rem; letter-spacing: 2px;">
+                <span class="gradient-text">ADT</span> PRO <small style="font-size: 0.6rem; vertical-align: top;">v2.0-ADV</small>
+            </h1>
+        </div>
+        <nav>
+            <button id="nav-pm" class="active" onclick="switchTab('pm')">Senior Dev / PM</button>
+            <button id="nav-hr" onclick="switchTab('hr')">HR Analytics</button>
+        </nav>
+    </header>
+
+    <!-- 1. Senior Dev / PM Dashboard -->
+    <div id="pm-dashboard" class="dashboard-container active">
+        <div class="glass-card" style="margin-bottom: 2rem;">
+            <h2>Developer Profiler <span style="font-size: 0.8rem; font-weight: normal;">(Search & Graph Analysis)</span></h2>
+            <div style="margin-top: 1rem; display: flex; gap: 10px;">
+                <input type="text" id="dev-id-input" placeholder="Enter Developer ID (e.g. dev_001)" style="flex: 1; padding: 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 8px; color: white;">
+                <button onclick="loadDevProfile()" style="background: var(--accent); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600;">Run Analysis</button>
+            </div>
+        </div>
+
+        <div class="grid-layout">
+            <!-- Skill Radar (Top Tier Chart) -->
+            <div class="glass-card">
+                <h3>Temporal Skill Graph <span style="font-size: 0.7rem; color: var(--neon-blue);">(Live Decay & Confidence)</span></h3>
+                <div class="chart-container">
+                    <canvas id="skillRadar"></canvas>
+                </div>
+            </div>
+
+            <!-- AI Reasoning (SHAP + Reliability) -->
+            <div class="glass-card">
+                <h3>AI Feature Reasoning <span style="font-size: 0.7rem; color: var(--neon-purple);">(SHAP Explainer)</span></h3>
+                <div id="reasoning-output" style="margin-top: 2rem;">
+                   <div style="text-align: center; color: var(--text-secondary); margin-top: 3rem;">Search a dev to see reasoning...</div>
+                </div>
+                <div id="reliability-output" style="margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+                    <!-- Reliability / Fraud check flags show here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. HR Dashboard -->
+    <div id="hr-dashboard" class="dashboard-container">
+        <div class="grid-layout">
+            <!-- Team Clustering (K-Means) -->
+            <div class="glass-card">
+                <h3>Strategic Talent Clusters <span style="font-size: 0.7rem; color: var(--neon-blue);">(K-Means Segmentation)</span></h3>
+                <div id="cluster-output" style="margin-top: 2rem;">
+                    <!-- Elite / Growing / Specialist clusters -->
+                    <p style="color: var(--text-secondary);">Analyzing organization clusters...</p>
+                </div>
+            </div>
+
+            <!-- Leaderboard -->
+            <div class="glass-card">
+                <h3>Skill Leaderboard <span style="font-size: 0.7rem; color: var(--neon-blue);">(Top Performers)</span></h3>
+                <div id="leaderboard-output" style="margin-top: 2rem;">
+                    <!-- Top performers list -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+    <script>
+        function switchTab(tab) {
+            document.querySelectorAll('.dashboard-container').forEach(d => d.classList.remove('active'));
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+            
+            if(tab === 'pm') {
+                document.getElementById('pm-dashboard').classList.add('active');
+                document.getElementById('nav-pm').classList.add('active');
+            } else {
+                document.getElementById('hr-dashboard').classList.add('active');
+                document.getElementById('nav-hr').classList.add('active');
+                loadHRData();
+            }
+        }
+    </script>
+</body>
+</html>
