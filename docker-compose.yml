@@ -1,14 +1,67 @@
 version: '3.8'
+
 services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: adt_user
+      POSTGRES_PASSWORD: adt_password
+      POSTGRES_DB: adt_db
+    ports:
+      - "5432:5432"
+
+  neo4j:
+    image: neo4j:5.12
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/adt_password
+
+  auth-service:
+    build: ./Authentication-Service
+    ports:
+      - "8001:8000"
+    environment:
+      DATABASE_URL: postgresql://adt_user:adt_password@postgres:5432/adt_db
+    depends_on:
+      - postgres
+
   telemetry-service:
-    build: ./telemetry-service
-    ports: ["8001:8000"]
-  
+    build: ./Telemetry-Service
+    ports:
+      - "8002:8000"
+    environment:
+      DATABASE_URL: postgresql://adt_user:adt_password@postgres:5432/adt_db
+    depends_on:
+      - postgres
+
   fusion-service:
-    build: ./fusion-service  
-    ports: ["8002:8000"]
-    
+    build: ./Fusion-Engine
+    ports:
+      - "8003:8000"
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: adt_password
+
   thg-service:
-    build: ./thg-service
-    ports: ["8003:8000"]
-    
+    build: ./THG-Service
+    ports:
+      - "8004:8000"
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: adt_password
+    depends_on:
+      - neo4j
+
+  gateway-service:
+    build: ./Gateway-Service
+    ports:
+      - "8000:8000"
+    environment:
+      AUTH_URL: http://auth-service:8000
+      TELEMETRY_URL: http://telemetry-service:8000
+      FUSION_URL: http://fusion-service:8000
+      THG_URL: http://thg-service:8000

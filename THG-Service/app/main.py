@@ -33,6 +33,4 @@ async def health(session=Depends(get_neo4j_session)):
         "status": "healthy", 
         "service": "thg",
         "neo4j_uri": settings.neo4j_uri.replace(settings.neo4j_password, "***"),
-        "neo4j_user": settings.neo4j_user,
-        "neo4j_password": settings.neo4j_password
     }
