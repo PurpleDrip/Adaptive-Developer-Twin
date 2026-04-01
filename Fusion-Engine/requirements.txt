@@ -3,3 +3,4 @@ uvicorn
 pydantic
 httpx
 neo4j
+scikit-learn
