@@ -12,9 +12,9 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["http://localhost:3000", "http://localhost:80"],
+    allow_methods=["GET", "POST", "PUT"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 app.include_router(thg.router, prefix="/api/v1/thg", tags=["thg"])
@@ -27,10 +27,14 @@ async def startup():
 async def shutdown():
     await close_neo4j()
 
-@app.get("/health")
+@app.get("/api/v1/thg/health")
 async def health(session=Depends(get_neo4j_session)):
+    neo4j_uri = str(settings.neo4j_uri)
+    if settings.neo4j_password:
+        neo4j_uri = neo4j_uri.replace(settings.neo4j_password, "***")
+
     return {
         "status": "healthy", 
         "service": "thg",
-        "neo4j_uri": settings.neo4j_uri.replace(settings.neo4j_password, "***"),
+        "neo4j_uri": neo4j_uri,
     }

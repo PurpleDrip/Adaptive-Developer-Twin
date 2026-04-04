@@ -1,0 +1,383 @@
+{
+  "info": {
+    "_postman_id": "adt-full-investor-collection",
+    "name": "ADT Full API - Investor Demo",
+    "description": "Complete ADT gateway collection including health, auth, telemetry, fusion, THG, allocation, and investor assessment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0) Platform Health",
+      "item": [
+        {
+          "name": "Gateway Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{gateway_url}}/health" }
+          }
+        },
+        {
+          "name": "Dashboard Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{dashboard_url}}/health" }
+          }
+        },
+        {
+          "name": "Auth Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/auth/health" }
+          }
+        },
+        {
+          "name": "Telemetry Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/telemetry/health" }
+          }
+        },
+        {
+          "name": "Fusion Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/fusion/health" }
+          }
+        },
+        {
+          "name": "THG Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/thg/health" }
+          }
+        },
+        {
+          "name": "Allocation Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/allocation/health" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1) Auth Flow",
+      "item": [
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"userName\": \"Investor Demo User\",\n  \"email\": \"investor.demo@example.com\",\n  \"bio\": \"Backend-focused engineer with FastAPI and Neo4j experience\",\n  \"gender\": \"Other\",\n  \"primary_domain\": \"backend\",\n  \"resume\": \"Python FastAPI Neo4j Docker microservices\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/auth/users/create" }
+          }
+        },
+        {
+          "name": "Get User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/auth/users/{{user_id}}" }
+          }
+        },
+        {
+          "name": "Upload Resume Profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resume_skills\": [\"Python\", \"FastAPI\", \"Neo4j\", \"Docker\"]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/auth/users/{{user_id}}/resume" }
+          }
+        },
+        {
+          "name": "Upload Projects",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"projects\": [\n    {\n      \"title\": \"Telemetry Fusion Engine\",\n      \"skills\": [\"Python\", \"FastAPI\", \"Neo4j\"],\n      \"quality_score\": 0.81\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/auth/users/{{user_id}}/projects" }
+          }
+        },
+        {
+          "name": "Upload Weekly Test",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"test_type\": \"backend_quiz\",\n  \"score\": 0.86,\n  \"skill_breakdown\": {\n    \"backend\": 0.86,\n    \"neo4j\": 0.72\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/auth/users/{{user_id}}/weekly-test" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2) Telemetry + Fusion",
+      "item": [
+        {
+          "name": "Send Telemetry",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"device_id\": \"investor-device-01\",\n  \"timestamp\": \"2026-04-04T10:00:00Z\",\n  \"session_duration\": 30.0,\n  \"files\": {\"api.py\": 1.2, \"router.py\": 0.8},\n  \"wpm\": 47.0,\n  \"keystrokes\": 980,\n  \"commands_executed\": 40,\n  \"languages_used\": {\"python\": 0.85, \"sql\": 0.15},\n  \"code_snippet\": \"from fastapi import APIRouter\\nrouter = APIRouter()\",\n  \"git_branch\": \"investor-demo\",\n  \"git_commits\": 2,\n  \"errors_fixed\": 3,\n  \"terminal_commands\": [\"pytest\", \"uvicorn app.main:app --reload\"],\n  \"active_extensions\": [\"python\", \"docker\"]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/telemetry/telemetry" }
+          }
+        },
+        {
+          "name": "Summarize Telemetry",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{base_url}}/telemetry/telemetry/{{user_id}}/summarize" }
+          }
+        },
+        {
+          "name": "Fusion Analyze Text",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Build FastAPI backend with Neo4j and Docker CI/CD\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/fusion/fusion/analyze-text" }
+          }
+        },
+        {
+          "name": "Fusion Explain User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/fusion/fusion/{{user_id}}/explain" }
+          }
+        },
+        {
+          "name": "Run Fusion",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"telemetry_summary\": {\n    \"top_files\": [\"api.py\", \"router.py\", \"Dockerfile\"],\n    \"language_distribution\": {\"python\": 0.85, \"sql\": 0.15},\n    \"total_commands\": 140,\n    \"avg_wpm\": 47,\n    \"code_snippet\": \"from fastapi import APIRouter\"\n  },\n  \"resume_profile\": {\n    \"resume_skills\": [\"python\", \"neo4j\", \"docker\"]\n  },\n  \"project_profile\": {\n    \"projects\": [\n      {\n        \"skills\": [\"python\", \"fastapi\", \"neo4j\"],\n        \"quality_score\": 0.81\n      }\n    ]\n  },\n  \"weekly_tests\": [\n    {\n      \"skill_breakdown\": {\"backend\": 0.86, \"neo4j\": 0.72}\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/fusion/fusion/{{user_id}}/run" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3) Investor Endpoint",
+      "item": [
+        {
+          "name": "Investor Assessment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"telemetry_summary\": {\n    \"top_files\": [\"api.py\", \"router.py\", \"Dockerfile\"],\n    \"language_distribution\": {\"python\": 0.85, \"sql\": 0.15},\n    \"total_commands\": 140,\n    \"avg_wpm\": 47,\n    \"code_snippet\": \"from fastapi import APIRouter\\nrouter = APIRouter()\\n@router.get('/health')\",\n    \"session_duration\": 30,\n    \"keystrokes\": 980,\n    \"wpm\": 47,\n    \"commands_executed\": 40\n  },\n  \"resume_profile\": {\n    \"resume_skills\": [\"python\", \"fastapi\", \"neo4j\", \"docker\"]\n  },\n  \"project_profile\": {\n    \"projects\": [\n      {\n        \"skills\": [\"python\", \"fastapi\", \"neo4j\"],\n        \"quality_score\": 0.81\n      }\n    ]\n  },\n  \"weekly_tests\": [\n    {\n      \"skill_breakdown\": {\"backend\": 0.88, \"neo4j\": 0.73}\n    }\n  ],\n  \"telemetry_batch\": [\n    {\"session_duration\": 30, \"keystrokes\": 980, \"wpm\": 47, \"commands_executed\": 40},\n    {\"session_duration\": 28, \"keystrokes\": 910, \"wpm\": 45, \"commands_executed\": 37},\n    {\"session_duration\": 35, \"keystrokes\": 1020, \"wpm\": 49, \"commands_executed\": 43},\n    {\"session_duration\": 32, \"keystrokes\": 995, \"wpm\": 46, \"commands_executed\": 41},\n    {\"session_duration\": 27, \"keystrokes\": 870, \"wpm\": 44, \"commands_executed\": 35},\n    {\"session_duration\": 33, \"keystrokes\": 1005, \"wpm\": 48, \"commands_executed\": 42}\n  ],\n  \"expected_skills\": {\n    \"backend\": 0.8,\n    \"neo4j\": 0.72,\n    \"devops\": 0.65,\n    \"frontend\": 0.35\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/fusion/fusion/investor/assessment" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4) THG Graph",
+      "item": [
+        {
+          "name": "Get Developers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/thg/thg/developers" }
+          }
+        },
+        {
+          "name": "Get User Skills",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/thg/thg/{{user_id}}/skills" }
+          }
+        },
+        {
+          "name": "Update THG Skill",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dev_id\": \"{{user_id}}\",\n  \"skill_name\": \"backend\",\n  \"strength\": 0.78,\n  \"confidence\": 0.9\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/thg/thg/update" }
+          }
+        },
+        {
+          "name": "Match Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"task_id\": \"{{task_id}}\",\n  \"required_skills\": {\n    \"backend\": 1.0,\n    \"neo4j\": 0.7\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/thg/thg/match" }
+          }
+        },
+        {
+          "name": "Leaderboard (backend)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/thg/thg/leaderboard/backend" }
+          }
+        },
+        {
+          "name": "Record Assignment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dev_id\": \"{{user_id}}\",\n  \"task_id\": \"{{task_id}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/thg/thg/record-assignment" }
+          }
+        },
+        {
+          "name": "Generate Demo Data (Reset Graph)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{base_url}}/thg/thg/generate-demo-data" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5) Allocation",
+      "item": [
+        {
+          "name": "Rank Developers",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"task_desc\": \"Build a FastAPI backend with Neo4j and Docker deployment\",\n  \"min_confidence\": 0.5\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/allocation/rank" }
+          }
+        },
+        {
+          "name": "Select Developer",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{base_url}}/allocation/select?user_id={{user_id}}&task_id={{task_id}}" }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "gateway_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "dashboard_url",
+      "value": "http://localhost",
+      "type": "string"
+    },
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "investor_demo_001",
+      "type": "string"
+    },
+    {
+      "key": "task_id",
+      "value": "task_investor_001",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('user_id')) {",
+          "  pm.collectionVariables.set('user_id', 'investor_' + Date.now());",
+          "}",
+          "if (!pm.collectionVariables.get('task_id')) {",
+          "  pm.collectionVariables.set('task_id', 'task_' + Date.now());",
+          "}"
+        ]
+      }
+    }
+  ]
+}

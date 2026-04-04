@@ -1,4 +1,5 @@
-from pydantic import BaseSettings, AnyUrl
+from pydantic_settings import BaseSettings
+from pydantic import AnyUrl
 
 class Settings(BaseSettings):
     neo4j_uri: AnyUrl

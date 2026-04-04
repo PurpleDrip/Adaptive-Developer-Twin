@@ -7,7 +7,7 @@ _driver = None
 async def init_neo4j():
     global _driver
     _driver = AsyncGraphDatabase.driver(
-        settings.neo4j_uri, 
+        str(settings.neo4j_uri), 
         auth=(settings.neo4j_user, settings.neo4j_password)
     )
 

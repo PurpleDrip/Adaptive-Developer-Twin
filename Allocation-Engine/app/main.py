@@ -4,9 +4,9 @@ from app.routers import allocation
 
 app = FastAPI(title="ADT Allocation Engine", version="1.0.0")
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3000", "http://localhost:80"], allow_methods=["GET", "POST"], allow_headers=["Content-Type", "Authorization"])
 app.include_router(allocation.router, prefix="/api/v1/allocation", tags=["allocation"])
 
-@app.get("/health")
+@app.get("/api/v1/allocation/health")
 async def health():
-    return {"status": "healthy", "service": "allocation"}
+    return {"status": "healthy", "service": "allocation-engine"}
