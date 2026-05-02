@@ -169,3 +169,29 @@ async def validate_extension(extension_id: str, machine_id: str):
     users_col = get_collection("users")
     user = await users_col.find_one({"extension_id": extension_id})
     return {"user_id": user["user_id"], "name": user["name"]}
+
+@router.get("/by-role/{role}")
+async def get_users_by_role(role: str):
+    """Fetches all active users of a specific role."""
+    users_col = get_collection("users")
+    
+    # Simple logic: Senior/Lead/Principal are PMs, others are Developers
+    if role == "project_manager":
+        users = await users_col.find({"experience_level": {"$in": ["Senior", "Lead", "Principal"]}}).to_list(100)
+    else:
+        users = await users_col.find({"experience_level": {"$in": ["Intern", "Junior", "Mid"]}}).to_list(100)
+        
+    return [{"user_id": u["user_id"], "name": u["name"], "username": u["username"], "manager_id": u.get("manager_id")} for u in users]
+
+@router.post("/assign-manager")
+async def assign_manager(developer_id: str, manager_id: str):
+    """Binds a developer to a specific Project Manager."""
+    users_col = get_collection("users")
+    result = await users_col.update_one(
+        {"user_id": developer_id},
+        {"$set": {"manager_id": manager_id}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Developer not found or assignment unchanged")
+    
+    return {"status": "success", "message": f"Developer {developer_id} assigned to Manager {manager_id}"}

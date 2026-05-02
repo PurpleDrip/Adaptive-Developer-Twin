@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@xyflow/react": "^12.10.2",
     "axios": "^1.16.0",
     "clsx": "^2.1.1",
     "lodash": "^4.18.1",

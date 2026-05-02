@@ -16,14 +16,12 @@ export default function LoginPage() {
     e.preventDefault();
     // Simulate navigation
     if (role === 'developer') router.push('/dashboard');
-    else if (role === 'senior_manager') router.push('/senior');
-    else if (role === 'hrm') router.push('/hrm');
+    else if (role === 'project_manager') router.push('/project-manager');
   };
 
   const roleTitles: Record<string, string> = {
     developer: "Developer Portal",
-    senior_manager: "Management Console",
-    hrm: "HRM Analytics Suite"
+    project_manager: "Project Management Console"
   };
 
   return (
@@ -61,7 +59,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {(role === 'senior_manager' || role === 'hrm') && (
+        {role === 'project_manager' && (
           <div className="mt-8 flex items-center justify-center gap-2 text-xs text-gray-500 italic">
             <Shield size={14} /> Credentials provided by Technical Support
           </div>
