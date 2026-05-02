@@ -1,7 +1,0 @@
-fastapi
-uvicorn
-pydantic
-numpy
-scikit-learn
-neo4j
-httpx

@@ -1,0 +1,73 @@
+{
+  "name": "adt-extension",
+  "displayName": "Adaptive Developer Twin (ADT)",
+  "description": "Production-grade AI-orchestrated developer life-cycle management.",
+  "version": "1.0.0",
+  "publisher": "PurpleDrip",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "adt.register",
+        "title": "ADT: Register Developer"
+      },
+      {
+        "command": "adt.status",
+        "title": "ADT: View My Stats"
+      }
+    ],
+    "configuration": {
+      "title": "ADT",
+      "properties": {
+        "adt.gatewayUrl": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "URL of the ADT API Gateway"
+        },
+        "adt.extensionId": {
+          "type": "string",
+          "default": "",
+          "description": "Unique Extension ID from registration"
+        },
+        "adt.userId": {
+          "type": "string",
+          "default": "",
+          "description": "Your ADT User ID"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "20.2.5",
+    "@typescript-eslint/eslint-plugin": "^5.59.8",
+    "@typescript-eslint/parser": "^5.59.8",
+    "eslint": "^8.41.0",
+    "glob": "^8.1.0",
+    "mocha": "^10.2.0",
+    "typescript": "^5.1.3",
+    "@vscode/test-electron": "^2.3.2"
+  },
+  "dependencies": {
+    "axios": "^1.4.0"
+  }
+}

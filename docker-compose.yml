@@ -8,6 +8,7 @@ services:
       - "7687:7687"
     environment:
       NEO4J_AUTH: ${NEO4J_AUTH}
+      NEO4J_PLUGINS: '["graph-data-science"]'
     volumes:
       - neo4j_data:/data
       - neo4j_logs:/logs
@@ -27,72 +28,160 @@ services:
       timeout: 10s
       retries: 5
 
+  mongodb:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   auth-service:
-    build: ./Authentication-Service
+    build:
+      context: .
+      dockerfile: backend/auth/Dockerfile
     ports:
       - "8001:8000"
     environment:
       THG_URL: ${THG_URL}
       FUSION_URL: ${FUSION_URL}
+      MONGO_URI: ${MONGO_URI}
+    depends_on:
+      - mongodb
 
   telemetry-service:
-    build: ./Telemetry-Service
+    build:
+      context: .
+      dockerfile: backend/telemetry/Dockerfile
     ports:
       - "8002:8000"
     environment:
       FUSION_URL: ${FUSION_URL}
       THG_URL: ${THG_URL}
+      AUTH_URL: ${AUTH_URL}
+      MONGO_URI: ${MONGO_URI}
+    depends_on:
+      - mongodb
 
   fusion-service:
-    build: ./Fusion-Engine
+    build:
+      context: .
+      dockerfile: backend/fusion/Dockerfile
     ports:
       - "8003:8000"
     environment:
-      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_URI: ${NEO4J_URI}
       NEO4J_USER: ${NEO4J_USER}
       NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      MONGO_URI: ${MONGO_URI}
+    depends_on:
+      - mongodb
 
   thg-service:
-    build: ./THG-Service
+    build:
+      context: .
+      dockerfile: backend/thg/Dockerfile
     ports:
       - "8004:8000"
     environment:
-      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_URI: ${NEO4J_URI}
       NEO4J_USER: ${NEO4J_USER}
       NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      MONGO_URI: ${MONGO_URI}
     depends_on:
       - neo4j
+      - mongodb
 
   allocation-engine:
-    build: ./Allocation-Engine
+    build:
+      context: .
+      dockerfile: backend/allocation/Dockerfile
     ports:
       - "8005:8000"
     environment:
-      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_URI: ${NEO4J_URI}
       NEO4J_USER: ${NEO4J_USER}
       NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      THG_URL: ${THG_URL}
+      FUSION_URL: ${FUSION_URL}
+      MONGO_URI: ${MONGO_URI}
     depends_on:
       - neo4j
+      - mongodb
+
+  analytics-service:
+    build:
+      context: .
+      dockerfile: backend/analytics/Dockerfile
+    ports:
+      - "8006:8000"
+    environment:
+      MONGO_URI: ${MONGO_URI}
+      THG_URL: ${THG_URL}
+      FUSION_URL: ${FUSION_URL}
+    depends_on:
+      - mongodb
+
+  monitoring-service:
+    build:
+      context: .
+      dockerfile: backend/monitoring/Dockerfile
+    ports:
+      - "8007:8000"
+    environment:
+      MONGO_URI: ${MONGO_URI}
+    depends_on:
+      - mongodb
+
+  task-service:
+    build:
+      context: .
+      dockerfile: backend/task/Dockerfile
+    ports:
+      - "8008:8000"
+    environment:
+      MONGO_URI: ${MONGO_URI}
+      THG_URL: ${THG_URL}
+      ALLOCATION_URL: ${ALLOCATION_URL}
+      FUSION_URL: ${FUSION_URL}
+    depends_on:
+      - mongodb
 
   gateway-service:
-    build: ./Gateway-Service
+    build:
+      context: .
+      dockerfile: backend/gateway/Dockerfile
     ports:
       - "8000:8000"
     environment:
-      CORS_ORIGINS: http://localhost,http://localhost:80,http://localhost:3000,http://localhost:5173,http://127.0.0.1,http://127.0.0.1:3000,http://127.0.0.1:5173
+      CORS_ORIGINS: ${CORS_ORIGINS}
       AUTH_URL: ${AUTH_URL}
       TELEMETRY_URL: ${TELEMETRY_URL}
       FUSION_URL: ${FUSION_URL}
       THG_URL: ${THG_URL}
       ALLOCATION_URL: ${ALLOCATION_URL}
+      ANALYTICS_URL: ${ANALYTICS_URL}
+      MONITORING_URL: ${MONITORING_URL}
+      TASK_URL: ${TASK_URL}
 
-  dashboard-service:
-    build: ./Dashboard-Service
+  dashboard-ui:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
     ports:
-      - "80:8000"
+      - "3000:80"
     depends_on:
       - gateway-service
 
 volumes:
   neo4j_data:
   neo4j_logs:
+  mongo_data:

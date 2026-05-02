@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pydantic
+httpx
+motor
+passlib[bcrypt]
+python-multipart
