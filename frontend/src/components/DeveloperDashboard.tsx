@@ -1,62 +1,76 @@
-import React from 'react';
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, AreaChart, Area } from 'recharts';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
 import { Award, Zap, Clock, Code } from 'lucide-react';
 
-const data = [
-  { subject: 'Backend', A: 120, fullMark: 150 },
-  { subject: 'Frontend', A: 98, fullMark: 150 },
-  { subject: 'DevOps', A: 86, fullMark: 150 },
-  { subject: 'ML/AI', A: 99, fullMark: 150 },
-  { subject: 'Database', A: 85, fullMark: 150 },
-  { subject: 'Security', A: 65, fullMark: 150 },
-];
-
-const activityData = [
-  { name: 'Mon', wpm: 45, commits: 12 },
-  { name: 'Tue', wpm: 52, commits: 18 },
-  { name: 'Wed', wpm: 48, commits: 15 },
-  { name: 'Thu', wpm: 61, commits: 22 },
-  { name: 'Fri', wpm: 55, commits: 10 },
-];
+const GATEWAY_URL = "http://localhost:8000/api/v1";
 
 const DeveloperDashboard = () => {
+  const [skills, setSkills] = useState([]);
+  const [metrics, setMetrics] = useState({ wpm: 0, active_hours: 0, lines: 0 });
+  const [account, setAccount] = useState({ userId: "...", extensionId: "..." });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const userId = "admin_user"; 
+        const skillResp = await axios.get(`${GATEWAY_URL}/thg/thg/${userId}/skills`);
+        setSkills(skillResp.data.skills.map(s => ({ subject: s.name, A: s.strength * 100 })));
+        
+        const statsResp = await axios.get(`${GATEWAY_URL}/analytics/stats/${userId}/summary`);
+        setMetrics(statsResp.data);
+        
+        setAccount({ userId: userId, extensionId: "ext_active" });
+      } catch (e) {
+        console.error("Failed to fetch live data", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (loading) return <div className="animate-fade"><h3>Synchronizing Twin...</h3></div>;
+
   return (
     <div className="dashboard-grid animate-fade">
       <div className="span-full welcome-banner glass-card">
         <div>
-          <h1>The Ladder Climb <Award className="accent-icon" /></h1>
-          <p className="text-secondary">Level 14 Senior Architect. 2,400 XP to next rank.</p>
+          <h1>Your Ladder Climb <Award className="accent-icon" /></h1>
+          <p className="text-secondary">Track your professional evolution in real-time.</p>
+          <div className="account-ids">
+            <span>User ID: <code className="accent-primary">{account.userId}</code></span>
+            <span style={{marginLeft: '20px'}}>Extension ID: <code className="accent-secondary">{account.extensionId}</code></span>
+          </div>
         </div>
-        <div className="rank-badge">Elite Tier</div>
       </div>
 
       <div className="glass-card skill-radar">
-        <h3>Skill Proficiencies</h3>
+        <h3>Live Skill Proficiency</h3>
         <div style={{ width: '100%', height: 300 }}>
-          <ResponsiveContainer>
-            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data}>
-              <PolarGrid stroke="#262626" />
-              <PolarAngleAxis dataKey="subject" tick={{ fill: '#a0a0a0', fontSize: 12 }} />
-              <Radar name="Skills" dataKey="A" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.5} />
-            </RadarChart>
-          </ResponsiveContainer>
+          {skills.length > 0 ? (
+            <ResponsiveContainer>
+              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={skills}>
+                <PolarGrid stroke="#262626" />
+                <PolarAngleAxis dataKey="subject" tick={{ fill: '#a0a0a0', fontSize: 12 }} />
+                <Radar name="Skills" dataKey="A" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.5} />
+              </RadarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="empty-state">No skill data fused yet. Start coding to seed your graph.</div>
+          )}
         </div>
       </div>
 
       <div className="glass-card stats-overview">
-        <h3>Productivity Trends</h3>
+        <h3>Productivity Momentum</h3>
         <div style={{ width: '100%', height: 300 }}>
           <ResponsiveContainer>
-            <AreaChart data={activityData}>
-              <defs>
-                <linearGradient id="colorWpm" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
+            <AreaChart data={[]}>
               <XAxis dataKey="name" stroke="#525252" fontSize={12} />
               <Tooltip contentStyle={{ backgroundColor: '#161616', borderColor: '#262626' }} />
-              <Area type="monotone" dataKey="wpm" stroke="#3b82f6" fillOpacity={1} fill="url(#colorWpm)" />
+              <Area type="monotone" dataKey="wpm" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -66,36 +80,22 @@ const DeveloperDashboard = () => {
         <div className="stat-item">
           <Zap className="accent-icon" />
           <div>
-            <p className="label">Avg WPM</p>
-            <p className="value">58</p>
+            <p className="label">Current WPM</p>
+            <p className="value">{metrics.wpm || 0}</p>
           </div>
         </div>
         <div className="stat-item">
           <Clock className="accent-icon" />
           <div>
-            <p className="label">Active Hours</p>
-            <p className="value">38.5h</p>
+            <p className="label">Focus Hours</p>
+            <p className="value">{metrics.active_hours || 0}h</p>
           </div>
         </div>
         <div className="stat-item">
           <Code className="accent-icon" />
           <div>
-            <p className="label">Lines Authored</p>
-            <p className="value">12.4k</p>
-          </div>
-        </div>
-      </div>
-      
-      <div className="glass-card active-tasks">
-        <h3>Active Assignments</h3>
-        <div className="task-list">
-          <div className="task-row">
-            <span className="task-title">Migrate Auth to MongoDB</span>
-            <span className="status-chip in-progress">In Progress</span>
-          </div>
-          <div className="task-row">
-            <span className="task-title">Optimize Bayesian Fusion</span>
-            <span className="status-chip review">In Review</span>
+            <p className="label">Code Impact</p>
+            <p className="value">{metrics.lines || 0}</p>
           </div>
         </div>
       </div>

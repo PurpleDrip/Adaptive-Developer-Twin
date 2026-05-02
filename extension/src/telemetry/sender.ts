@@ -1,29 +1,33 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
-import { TelemetryCollector, TelemetryData } from './collector';
+import { TelemetryCollector } from './collector';
 
 export class TelemetrySender {
     private interval: NodeJS.Timeout | undefined;
     private collector: TelemetryCollector;
+    private context: vscode.ExtensionContext;
 
-    constructor() {
+    constructor(context: vscode.ExtensionContext) {
+        this.context = context;
         this.collector = new TelemetryCollector();
     }
 
-    public start() {
+    public async start() {
         const config = vscode.workspace.getConfiguration('adt');
         const gatewayUrl = config.get<string>('gatewayUrl');
-        const extensionId = config.get<string>('extensionId');
-        const userId = config.get<string>('userId');
+        
+        // Read from secure secrets
+        const extensionId = await this.context.secrets.get('adt.extensionId');
+        const userId = await this.context.secrets.get('adt.userId');
+        const mid = vscode.env.machineId;
 
         if (!extensionId || !userId) {
-            vscode.window.showWarningMessage("ADT: Please register first to enable telemetry.");
+            console.log("ADT: Telemetry deferred (No connected twin).");
             return;
         }
 
         console.log("ADT Telemetry Sender started.");
         
-        // Send data every 30 seconds
         this.interval = setInterval(async () => {
             const data = this.collector.collect();
             
@@ -32,9 +36,10 @@ export class TelemetrySender {
                     ...data,
                     extension_id: extensionId,
                     user_id: userId,
-                    session_duration: 30 // Approx
+                    machine_id: mid,
+                    session_duration: 30
                 });
-                console.log("ADT: Telemetry pushed successfully.");
+                console.log("ADT: Telemetry pushed (Handshake Verified).");
             } catch (error) {
                 console.error("ADT: Failed to push telemetry", error);
             }

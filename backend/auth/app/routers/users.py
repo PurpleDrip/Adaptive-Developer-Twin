@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 import httpx
 import os
 import uuid
+import redis
+import json
 from datetime import datetime
 from typing import List, Optional
 from shared.models.user import UserRegistrationDTO, UserDocument, UserProfileResponse
@@ -11,6 +13,9 @@ from passlib.context import CryptContext
 router = APIRouter(prefix="/users", tags=["users"])
 FUSION_URL = os.getenv("FUSION_URL", "http://fusion-service:8000")
 THG_URL = os.getenv("THG_URL", "http://thg-service:8000")
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+r_client = redis.from_url(REDIS_URL, decode_responses=True)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -30,12 +35,23 @@ async def register_user(dto: UserRegistrationDTO, background_tasks: BackgroundTa
     user_id = str(uuid.uuid4())
     extension_id = f"ADT-{uuid.uuid4().hex[:8].upper()}"
     
-    # Hash password
-    dto.password = pwd_context.hash(dto.password)
+    # Bcrypt has a 72-byte limit for passwords
+    raw_password = dto.password[:72]
+    dto.password = pwd_context.hash(raw_password)
     
     # Create document
     user_doc = UserDocument.create(dto, user_id, extension_id)
     await users_col.insert_one(user_doc)
+
+    # Add to Whitelist for hardware locking
+    whitelist_col = get_collection("whitelist")
+    await whitelist_col.insert_one({
+        "extension_id": extension_id,
+        "user_id": user_id,
+        "is_active": True,
+        "machine_id": None, # Will be locked on first extension handshake
+        "created_at": datetime.utcnow()
+    })
     
     # Initialize in THG (Neo4j)
     try:
@@ -80,6 +96,30 @@ async def trigger_project_analysis(user_id: str, urls: List[str]):
             except Exception as e:
                 print(f"Project analysis failed for {url}: {e}")
 
+@router.post("/save-session")
+async def save_reg_session(session_id: str, data: dict):
+    """Saves partial registration data to Redis (expires in 24h)."""
+    r_client.setex(f"reg_session:{session_id}", 86400, json.dumps(data))
+    return {"status": "saved"}
+
+@router.get("/get-session/{session_id}")
+async def get_reg_session(session_id: str):
+    """Retrieves partial registration data from Redis."""
+    data = r_client.get(f"reg_session:{session_id}")
+    if not data:
+        return {}
+    return json.loads(data)
+
+@router.get("/validate")
+async def validate_field(field: str, value: str):
+    """Checks if a username, email, or phone is already in use."""
+    users_col = get_collection("users")
+    if field not in ["username", "email", "phone_number"]:
+        return {"available": True}
+    
+    existing = await users_col.find_one({field: value})
+    return {"available": existing is None}
+
 @router.get("/{user_id}", response_model=UserProfileResponse)
 async def get_user_profile(user_id: str):
     users_col = get_collection("users")
@@ -88,12 +128,44 @@ async def get_user_profile(user_id: str):
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
-@router.post("/validate-extension")
-async def validate_extension(extension_id: str):
-    """Checks if an extension_id is valid and returns the user_id."""
-    users_col = get_collection("users")
-    user = await users_col.find_one({"extension_id": extension_id, "is_active": True})
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid extension ID")
+@router.post("/hardware-lock")
+async def hardware_lock(extension_id: str, machine_id: str):
+    """
+    Performs the hardware handshake. Locks an extension_id to a specific machine_id.
+    """
+    whitelist_col = get_collection("whitelist")
+    entry = await whitelist_col.find_one({"extension_id": extension_id, "is_active": True})
     
+    if not entry:
+        raise HTTPException(status_code=401, detail="Extension ID not found or inactive")
+    
+    # Trust on First Use (TOFU)
+    if entry.get("machine_id") is None:
+        await whitelist_col.update_one(
+            {"extension_id": extension_id},
+            {"$set": {"machine_id": machine_id, "locked_at": datetime.utcnow()}}
+        )
+        return {"status": "locked", "message": "Hardware successfully bound to this twin."}
+    
+    # Verification
+    if entry["machine_id"] != machine_id:
+        raise HTTPException(status_code=403, detail="Hardware Mismatch: This extension ID is locked to another device.")
+    
+    return {"status": "verified", "message": "Connection authenticated."}
+
+@router.post("/validate-extension")
+async def validate_extension(extension_id: str, machine_id: str):
+    """Checks if an extension_id is valid and matches the locked machine_id."""
+    whitelist_col = get_collection("whitelist")
+    entry = await whitelist_col.find_one({
+        "extension_id": extension_id, 
+        "machine_id": machine_id, 
+        "is_active": True
+    })
+    
+    if not entry:
+        raise HTTPException(status_code=401, detail="Invalid extension ID or hardware mismatch")
+    
+    users_col = get_collection("users")
+    user = await users_col.find_one({"extension_id": extension_id})
     return {"user_id": user["user_id"], "name": user["name"]}

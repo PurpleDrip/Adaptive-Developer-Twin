@@ -189,6 +189,19 @@ nav a.active {
   font-size: 0.8rem;
 }
 
+.account-ids {
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.account-ids code {
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
 /* Mini Stats */
 .mini-stats {
   display: flex;
@@ -264,3 +277,182 @@ nav a.active {
 }
 .action-badge.positive { color: var(--accent-success); }
 .action-badge.warning { color: var(--accent-warning); }
+
+/* Landing & Onboarding */
+.landing-container {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px;
+  background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.1), transparent);
+}
+
+.landing-content, .onboarding-content {
+  max-width: 900px;
+  width: 100%;
+  text-align: center;
+}
+
+.main-title {
+  font-size: 3.5rem;
+  margin-bottom: 10px;
+}
+
+.subtitle {
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  margin-bottom: 40px;
+}
+
+.role-grid, .choice-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.role-card, .choice-card {
+  padding: 40px;
+  cursor: pointer;
+  transition: transform 0.3s, border-color 0.3s;
+  text-align: center;
+}
+
+.role-card:hover, .choice-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--accent-primary);
+}
+
+.role-card.active {
+  border-color: var(--accent-primary);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.role-icon {
+  margin-bottom: 20px;
+  color: var(--accent-primary);
+}
+
+/* Registration */
+.registration-container {
+  padding: 60px 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.form-wrapper {
+  max-width: 800px;
+  width: 100%;
+  padding: 40px;
+}
+
+.form-section {
+  margin-top: 32px;
+  text-align: left;
+}
+
+.form-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.1rem;
+  margin-bottom: 20px;
+  color: var(--accent-primary);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.reg-form input, .reg-form select {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  outline: none;
+}
+
+.domain-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.domain-tag {
+  background: var(--bg-tertiary);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.domain-tag.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+/* Success Card */
+.success-card {
+  max-width: 500px;
+  width: 100%;
+  padding: 50px;
+  text-align: center;
+}
+
+.id-box {
+  background: var(--bg-tertiary);
+  padding: 16px;
+  border-radius: 12px;
+  margin-top: 16px;
+  text-align: left;
+}
+
+.id-value {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.copy-icon {
+  cursor: pointer;
+  opacity: 0.5;
+}
+
+.copy-icon:hover {
+  opacity: 1;
+}
+
+.btn-large {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  background: var(--accent-primary);
+  color: white;
+  padding: 16px;
+  border-radius: 8px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-large:hover { opacity: 0.9; }
+
+.btn-text {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 20px;
+}

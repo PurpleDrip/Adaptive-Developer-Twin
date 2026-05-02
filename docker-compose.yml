@@ -44,18 +44,6 @@ services:
       timeout: 10s
       retries: 5
 
-  auth-service:
-    build:
-      context: .
-      dockerfile: backend/auth/Dockerfile
-    ports:
-      - "8001:8000"
-    environment:
-      THG_URL: ${THG_URL}
-      FUSION_URL: ${FUSION_URL}
-      MONGO_URI: ${MONGO_URI}
-    depends_on:
-      - mongodb
 
   telemetry-service:
     build:
@@ -172,14 +160,27 @@ services:
       MONITORING_URL: ${MONITORING_URL}
       TASK_URL: ${TASK_URL}
 
-  dashboard-ui:
+
+  redis:
+    image: redis:7.0-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  auth-service:
     build:
       context: .
-      dockerfile: frontend/Dockerfile
+      dockerfile: backend/auth/Dockerfile
     ports:
-      - "3000:80"
+      - "8001:8000"
+    environment:
+      THG_URL: ${THG_URL}
+      FUSION_URL: ${FUSION_URL}
+      MONGO_URI: ${MONGO_URI}
+      REDIS_URL: redis://redis:6379
     depends_on:
-      - gateway-service
+      - mongodb
+      - redis
 
 volumes:
   neo4j_data:

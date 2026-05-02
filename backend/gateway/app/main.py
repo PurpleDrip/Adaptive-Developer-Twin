@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="ADT API Gateway", version="1.0.0")
 
 # Secure CORS configuration
-default_cors = "http://localhost,http://localhost:80,http://localhost:3000,http://localhost:5173,http://127.0.0.1,http://127.0.0.1:3000,http://127.0.0.1:5173"
+default_cors = "http://localhost,http://localhost:80,http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:5173"
 cors_origins = os.getenv("CORS_ORIGINS", default_cors).split(",")
 app.add_middleware(
     CORSMiddleware,

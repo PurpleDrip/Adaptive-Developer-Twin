@@ -19,7 +19,8 @@ def simulate():
         "password": "SecurePassword123!",
         "strong_domains": ["backend", "neo4j", "ml"],
         "experience_level": "Senior",
-        "github_project_urls": ["https://github.com/shashanth/adt-v1"]
+        "github_project_urls": ["https://github.com/shashanth/adt-v1"],
+        "machine_id": "MOCK_OFFICE_DEVICE_001"
     }
     
     reg_resp = requests.post(f"{GATEWAY_URL}/auth/users/register", json=user_data)

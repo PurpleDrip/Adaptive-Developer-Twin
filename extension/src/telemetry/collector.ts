@@ -31,11 +31,6 @@ export class TelemetryCollector {
                 this.charCount += text.length;
             }
         });
-
-        // Track Commands (Approximate)
-        vscode.commands.onDidExecuteCommand(() => {
-            this.commandsCount++;
-        });
     }
 
     public collect(): TelemetryData {

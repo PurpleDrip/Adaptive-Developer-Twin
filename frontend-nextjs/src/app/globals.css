@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-primary: #000000;
+  --color-bg-secondary: #0a0a0a;
+  --color-bg-tertiary: #161616;
+  --color-accent-primary: #3b82f6;
+  --color-accent-secondary: #8b5cf6;
+  --color-accent-success: #10b981;
+  --color-accent-warning: #f59e0b;
+  --color-accent-danger: #ef4444;
+  --color-border-primary: #262626;
+
+  --font-inter: var(--font-inter);
+}
+
+@layer base {
+  body {
+    @apply bg-black text-white;
+    font-family: var(--font-inter), system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-zinc-900/70 backdrop-blur-xl border border-zinc-800 rounded-2xl shadow-2xl;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-br from-blue-500 to-purple-500 bg-clip-text text-transparent font-extrabold;
+  }
+
+  .btn-large {
+    @apply flex items-center justify-center gap-2.5 w-full bg-blue-600 text-white p-4 rounded-lg font-bold transition-opacity hover:opacity-90;
+  }
+
+  .btn-text {
+    @apply bg-transparent border-none text-zinc-400 cursor-pointer flex items-center gap-1.5 mb-5 hover:text-white transition-colors;
+  }
+}
+
+/* Custom Keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade {
+  animation: fadeIn 0.5s ease forwards;
+}

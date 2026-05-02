@@ -1,14 +1,10 @@
-"""
-ADT User Model — Registration, profiles, extension metadata.
-"""
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 import re
 
-
 class UserRegistrationDTO(BaseModel):
-    """Full registration payload from VS Code extension."""
+    """Full registration payload from Website."""
     name: str = Field(..., min_length=2, max_length=100)
     username: str = Field(..., min_length=3, max_length=50, pattern=r'^[a-zA-Z0-9_]+$')
     email: str = Field(..., max_length=255)
@@ -27,66 +23,57 @@ class UserRegistrationDTO(BaseModel):
             raise ValueError('Invalid email format')
         return v.lower()
 
-    @field_validator('strong_domains')
-    @classmethod
-    def validate_domains(cls, v):
-        valid = {"backend", "frontend", "devops", "ml", "neo4j", "mobile", "data_engineering",
-                 "security", "cloud", "testing", "database", "fullstack"}
-        for d in v:
-            if d.lower() not in valid:
-                raise ValueError(f"Invalid domain: {d}. Valid: {valid}")
-        return [d.lower() for d in v]
-
-
-class UserDocument:
+class UserDocument(BaseModel):
     """MongoDB document structure for users collection."""
-    @staticmethod
-    def create(registration: UserRegistrationDTO, user_id: str, extension_id: str) -> dict:
-        return {
-            "user_id": user_id,
-            "name": registration.name,
-            "username": registration.username,
-            "email": registration.email,
-            "phone_number": registration.phone_number,
-            "gender": registration.gender,
-            "password_hash": registration.password,  # Will be hashed in auth phase
-            "strong_domains": registration.strong_domains,
-            "experience_level": registration.experience_level,
-            "role": "developer",  # default role
-            "extension_id": extension_id,
-            "extension_version": "1.0.0",
-            "extension_installed_at": datetime.utcnow(),
-            "github_project_urls": registration.github_project_urls or [],
-            "project_analysis_status": "pending",
-            "initial_skill_scores": {},
-            "registered_at": datetime.utcnow(),
-            "last_active": datetime.utcnow(),
-            "is_active": True,
-        }
-
-
-class AdminCreateAccountDTO(BaseModel):
-    """Tech Support creates HRM / Senior Dev accounts."""
-    name: str = Field(..., min_length=2, max_length=100)
-    username: str = Field(..., min_length=3, max_length=50)
-    email: str = Field(..., max_length=255)
-    phone_number: str = Field(..., min_length=10, max_length=15)
-    gender: str = Field(default="Other")
-    password: str = Field(..., min_length=8)
-    role: str = Field(..., pattern=r'^(senior_dev|hrm|tech_support)$')
-
-
-class UserProfileResponse(BaseModel):
-    """Public user profile response."""
     user_id: str
+    extension_id: str
     name: str
     username: str
     email: str
-    gender: str
-    strong_domains: List[str]
-    experience_level: str
     role: str
-    extension_id: Optional[str] = None
-    registered_at: Optional[datetime] = None
-    last_active: Optional[datetime] = None
-    is_active: bool = True
+    experience_level: str
+    strong_domains: List[str]
+    registered_at: datetime = Field(default_factory=datetime.utcnow)
+    machine_id: Optional[str] = None
+
+    @staticmethod
+    def create(dto: UserRegistrationDTO, user_id: str, extension_id: str) -> dict:
+        return {
+            "user_id": user_id,
+            "extension_id": extension_id,
+            "name": dto.name,
+            "username": dto.username,
+            "email": dto.email,
+            "phone_number": dto.phone_number,
+            "gender": dto.gender,
+            "password_hash": dto.password, # Note: Already hashed in router
+            "strong_domains": dto.strong_domains,
+            "experience_level": dto.experience_level,
+            "github_project_urls": dto.github_project_urls or [],
+            "role": "developer",
+            "registered_at": datetime.utcnow(),
+            "is_active": True,
+            "project_analysis_status": "pending"
+        }
+
+class UserProfileResponse(BaseModel):
+    """Safe response model for frontend."""
+    user_id: str
+    extension_id: str
+    name: str
+    email: str
+    role: str
+    experience_level: str
+    strong_domains: List[str]
+    registered_at: datetime
+    project_analysis_status: Optional[str] = "pending"
+
+class AdminCreateAccountDTO(BaseModel):
+    """Payload for Tech Support to create internal roles."""
+    name: str
+    username: str
+    email: str
+    phone_number: str
+    gender: str
+    password: str
+    role: str = Field(..., pattern=r'^(senior_manager|hrm|tech_support)$')
