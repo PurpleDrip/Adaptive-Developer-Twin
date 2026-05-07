@@ -6,33 +6,32 @@ from typing import Optional, List, Dict
 from datetime import datetime
 
 
+from enum import Enum
+
+class SyncType(str, Enum):
+    INITIAL = "initial"   # Full project sync at start of day
+    DELTA = "delta"       # 30-second diff
+    FINAL = "final"       # End of day verification
+
 class TelemetryIngestDTO(BaseModel):
-    """Payload sent by VS Code extension every 30 seconds."""
-    extension_id: str = Field(..., min_length=1, max_length=255,
-                               description="Unique extension ID assigned during registration")
+    """Payload sent by VS Code extension every 30 seconds (or on handshake)."""
+    extension_id: str = Field(..., min_length=1, max_length=255)
     user_id: str = Field(..., min_length=1, max_length=255)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-    session_duration: float = Field(..., ge=0, le=86400, description="Seconds since session start")
-    wpm: float = Field(..., ge=0, le=300, description="Words per minute in the current window")
-    keystrokes: int = Field(default=0, ge=0, le=1000000)
-    commands_executed: int = Field(default=0, ge=0, le=10000)
-    errors_encountered: int = Field(default=0, ge=0, le=10000)
-    errors_fixed: int = Field(default=0, ge=0, le=10000)
+    machine_id: str = Field(..., min_length=1, max_length=255)
+    sync_type: SyncType = SyncType.DELTA
+    
+    # Differential Payloads
     active_file: Optional[str] = Field(default=None, max_length=500)
-    files_touched: Dict[str, float] = Field(default_factory=dict,
-                                            description="filename → seconds spent")
-    languages_used: Dict[str, float] = Field(default_factory=dict,
-                                             description="language → percentage")
-    code_snippet: str = Field(default="", max_length=100000,
-                              description="Current active code context (up to 100KB)")
+    diff_payload: Optional[str] = Field(default=None, description="Unified diff for the active window")
+    workspace_snapshot_url: Optional[str] = Field(default=None, description="URL/Base64 of full zip for INITIAL/FINAL sync")
+    
+    # Metrics
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    wpm: float = Field(..., ge=0, le=300)
+    keystrokes: int = Field(default=0, ge=0)
+    commands_executed: int = Field(default=0, ge=0)
+    idle_seconds: float = Field(default=0.0, ge=0)
     git_branch: Optional[str] = Field(default="main", max_length=255)
-    git_commits: int = Field(default=0, ge=0, le=1000)
-    terminal_commands: List[str] = Field(default_factory=list, max_length=500)
-    active_extensions: List[str] = Field(default_factory=list, max_length=100)
-    cursor_movements: int = Field(default=0, ge=0, description="Number of cursor position changes")
-    selections_made: int = Field(default=0, ge=0, description="Number of text selections")
-    copy_paste_count: int = Field(default=0, ge=0, description="Copy-paste operations")
-    idle_seconds: float = Field(default=0.0, ge=0, description="Seconds with no activity in window")
 
 
 class TelemetryRawDocument:
@@ -42,27 +41,18 @@ class TelemetryRawDocument:
         return {
             "user_id": dto.user_id,
             "extension_id": dto.extension_id,
+            "machine_id": dto.machine_id,
+            "sync_type": dto.sync_type,
             "timestamp": dto.timestamp,
-            "session_duration": dto.session_duration,
             "wpm": dto.wpm,
             "keystrokes": dto.keystrokes,
             "commands_executed": dto.commands_executed,
-            "errors_encountered": dto.errors_encountered,
-            "errors_fixed": dto.errors_fixed,
-            "active_file": dto.active_file,
-            "files_touched": dto.files_touched,
-            "languages_used": dto.languages_used,
-            "code_snippet": dto.code_snippet,
-            "git_branch": dto.git_branch,
-            "git_commits": dto.git_commits,
-            "terminal_commands": dto.terminal_commands,
-            "active_extensions": dto.active_extensions,
-            "cursor_movements": dto.cursor_movements,
-            "selections_made": dto.selections_made,
-            "copy_paste_count": dto.copy_paste_count,
             "idle_seconds": dto.idle_seconds,
+            "active_file": dto.active_file,
+            "diff_payload": dto.diff_payload,
+            "workspace_snapshot_url": dto.workspace_snapshot_url,
+            "git_branch": dto.git_branch,
             "processed": False,
-            "batch_id": None,
             "ingested_at": datetime.utcnow(),
         }
 

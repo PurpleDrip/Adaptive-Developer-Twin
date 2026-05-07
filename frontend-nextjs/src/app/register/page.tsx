@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, Lock, Code, ArrowRight, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { User, Lock, Code, ArrowRight, ArrowLeft, AlertTriangle, FileText, Eye, EyeOff } from 'lucide-react';
 import { debounce } from 'lodash';
 
 // Internal Libs
@@ -29,6 +29,7 @@ export default function RegistrationPage() {
   const [ids, setIds] = useState({ userId: '', extensionId: '' });
   const [error, setError] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const domains = ["backend", "frontend", "devops", "ml", "neo4j", "mobile", "security", "cloud", "fullstack"];
 
@@ -187,7 +188,24 @@ export default function RegistrationPage() {
               </select>
 
               <div className="relative">
-                <input name="password" value={formData.password} type="password" placeholder="Password" onChange={handleInputChange} className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-lg outline-none focus:border-blue-500" required />
+                <div className="relative">
+                    <input 
+                        name="password" 
+                        value={formData.password} 
+                        type={showPassword ? "text" : "password"} 
+                        placeholder="Password" 
+                        onChange={handleInputChange} 
+                        className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-lg outline-none focus:border-blue-500" 
+                        required 
+                    />
+                    <button 
+                        type="button" 
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3.5 text-gray-500 hover:text-white transition-colors"
+                    >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                </div>
                 <div className="mt-2 h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
                     <div className={`h-full transition-all duration-500 ${passwordStrength.color}`} style={{ width: `${(passwordStrength.score + 1) * 20}%` }} />
                 </div>
@@ -248,57 +266,49 @@ export default function RegistrationPage() {
                 </div>
 
                 <div>
-                    <div className="flex items-center gap-2 mb-2">
-                        <label className="text-xs text-gray-500 block">Showcase Your Best Work</label>
-                        <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20">JUDGEMENT ZONE</span>
+                    <div className="flex items-center gap-2 mb-2 pt-6 border-t border-zinc-800/50">
+                        <label className="text-xs text-gray-500 block">The Judgement Zone</label>
+                        <span className="text-[10px] bg-red-500/10 text-red-500 px-2 py-0.5 rounded border border-red-500/20 font-bold tracking-widest">CRITICAL EVIDENCE</span>
                     </div>
-                    <p className="text-[10px] text-gray-400 mb-4 italic">Give us your best projects so we can judge your expertise properly.</p>
-                    
-                    <div className="space-y-2 mb-4">
-                        {formData.github_project_urls.map((url, idx) => (
-                            <div key={idx} className="flex justify-between items-center bg-zinc-900/50 border border-zinc-800 p-2 rounded text-sm group hover:border-blue-500/30 transition-all">
-                                <span className="text-blue-400 truncate text-xs">{url}</span>
-                                <button type="button" onClick={() => setFormData({...formData, github_project_urls: formData.github_project_urls.filter((_, i) => i !== idx)})} className="text-red-500 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">Remove</button>
+                    <p className="text-[10px] text-gray-400 mb-6 italic">Provide your professional history and repositories for deep logic auditing.</p>
+
+                    <div className="space-y-8">
+                        {/* Repo Showcase */}
+                        <div className="bg-zinc-900/30 p-6 rounded-xl border border-zinc-800/50">
+                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block mb-4">Codebase Repositories (GitHub)</label>
+                            <div className="space-y-3 mb-4">
+                                {formData.github_project_urls.map((url, idx) => (
+                                    <div key={idx} className="flex justify-between items-center bg-black/40 border border-zinc-800 p-2 rounded text-sm group hover:border-blue-500/30 transition-all">
+                                        <span className="text-blue-400 truncate text-[10px] font-mono">{url}</span>
+                                        <button type="button" onClick={() => setFormData({...formData, github_project_urls: formData.github_project_urls.filter((_, i) => i !== idx)})} className="text-red-500 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity uppercase font-bold">Remove</button>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                    {formData.github_project_urls.length < 5 && (
-                        <>
-                            <div className="flex gap-2">
-                                <input 
-                                    id="github_url_input"
-                                    placeholder="https://github.com/user/repo" 
-                                    className="bg-zinc-900 border border-zinc-800 p-2 text-sm rounded outline-none focus:border-blue-500 flex-1"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            const val = (e.target as HTMLInputElement).value;
-                                            if (val && !formData.github_project_urls.includes(val)) {
-                                                setFormData({...formData, github_project_urls: [...formData.github_project_urls, val]});
-                                                (e.target as HTMLInputElement).value = '';
+                            
+                            {formData.github_project_urls.length < 5 && (
+                                <div className="flex gap-2">
+                                    <input 
+                                        id="github_url_input"
+                                        placeholder="https://github.com/user/repo" 
+                                        className="bg-black/40 border border-zinc-800 p-2 text-xs rounded outline-none focus:border-blue-500 flex-1"
+                                    />
+                                    <button 
+                                        type="button" 
+                                        onClick={() => {
+                                            const input = document.getElementById('github_url_input') as HTMLInputElement;
+                                            if (input.value && !formData.github_project_urls.includes(input.value)) {
+                                                setFormData({...formData, github_project_urls: [...formData.github_project_urls, input.value]});
+                                                input.value = '';
                                             }
-                                        }
-                                    }}
-                                />
-                                <button 
-                                    type="button" 
-                                    onClick={() => {
-                                        const input = document.getElementById('github_url_input') as HTMLInputElement;
-                                        if (input.value && !formData.github_project_urls.includes(input.value)) {
-                                            setFormData({...formData, github_project_urls: [...formData.github_project_urls, input.value]});
-                                            input.value = '';
-                                        }
-                                    }} 
-                                    className="bg-blue-600 px-4 rounded text-xs font-bold hover:bg-blue-500 transition-colors shadow-lg shadow-blue-500/10"
-                                >
-                                    ADD PROJECT
-                                </button>
-                            </div>
-                            <p className="text-[10px] text-red-400 mt-2 flex items-center gap-1 font-semibold">
-                                <AlertTriangle size={10} /> Repository must be public for automated analysis
-                            </p>
-                        </>
-                    )}
+                                        }} 
+                                        className="bg-zinc-800 px-4 rounded text-[10px] font-bold hover:bg-zinc-700 transition-colors"
+                                    >
+                                        ADD REPO
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
           </section>

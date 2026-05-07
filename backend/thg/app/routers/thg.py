@@ -28,6 +28,10 @@ class TaskMatchDTO(BaseModel):
     task_id: str
     required_skills: Dict[str, float]
 
+class ManagerLinkDTO(BaseModel):
+    manager_id: str
+    dev_id: str
+
 class DeveloperCreateDTO(BaseModel):
     dev_id: str
     name: str
@@ -73,6 +77,26 @@ async def create_dev(
          gender=dev.gender, primary_domain=dev.primary_domain)
     
     return {"status": "success", "message": f"Dev {dev.dev_id} sync'd to Neo4j"}
+
+@router.post("/create-manager", status_code=201)
+async def create_manager(manager: DeveloperCreateDTO, session=Depends(get_neo4j_session)):
+    """Initializes a Manager node in the graph."""
+    await session.run("""
+        MERGE (m:Manager {id: $manager_id})
+        SET m.name = $name, m.created_at = datetime()
+    """, manager_id=manager.dev_id, name=manager.name)
+    return {"status": "success", "message": f"Manager {manager.dev_id} sync'd to Neo4j"}
+
+@router.post("/link-manager-dev", status_code=201)
+async def link_manager_dev(data: ManagerLinkDTO, session=Depends(get_neo4j_session)):
+    """Creates a MANAGES relationship between a Manager and a Developer."""
+    await session.run("""
+        MATCH (m:Manager {id: $m_id})
+        MATCH (d:Developer {id: $d_id})
+        MERGE (m)-[r:MANAGES]->(d)
+        SET r.assigned_at = datetime()
+    """, m_id=data.manager_id, d_id=data.dev_id)
+    return {"status": "success"}
 
 # 1. Update Developer Skill (Fusion → THG)
 @router.post("/update", status_code=201)

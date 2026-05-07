@@ -6,7 +6,7 @@ import redis
 import json
 from datetime import datetime
 from typing import List, Optional
-from shared.models.user import UserRegistrationDTO, UserDocument, UserProfileResponse
+from shared.models.user import UserRegistrationDTO, UserDocument, UserProfileResponse, LoginDTO
 from shared.database.mongo import get_collection
 from passlib.context import CryptContext
 
@@ -18,6 +18,27 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 r_client = redis.from_url(REDIS_URL, decode_responses=True)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+@router.post("/login")
+async def login_user(dto: LoginDTO):
+    """Verifies credentials and returns user profile."""
+    users_col = get_collection("users")
+    user = await users_col.find_one({"username": dto.username})
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    
+    # Verify password
+    if not pwd_context.verify(dto.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    
+    return {
+        "status": "success",
+        "user_id": user["user_id"],
+        "name": user["name"],
+        "role": user["role"],
+        "extension_id": user["extension_id"]
+    }
 
 @router.post("/register", status_code=201)
 async def register_user(dto: UserRegistrationDTO, background_tasks: BackgroundTasks):
@@ -79,22 +100,20 @@ async def register_user(dto: UserRegistrationDTO, background_tasks: BackgroundTa
 
 async def trigger_project_analysis(user_id: str, urls: List[str]):
     """Background task to call Fusion Engine for repo analysis."""
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    users_col = get_collection("users")
+    await users_col.update_one({"user_id": user_id}, {"$set": {"project_analysis_status": "analyzing"}})
+    
+    async with httpx.AsyncClient(timeout=300.0) as client:
         for url in urls:
             try:
-                resp = await client.post(f"{FUSION_URL}/api/v1/fusion/fusion/analyze-project", json={
+                await client.post(f"{FUSION_URL}/api/v1/fusion/fusion/analyze-project", json={
                     "user_id": user_id,
                     "github_url": url
                 })
-                if resp.status_code == 200:
-                    # Update status in Mongo
-                    users_col = get_collection("users")
-                    await users_col.update_one(
-                        {"user_id": user_id},
-                        {"$set": {"project_analysis_status": "completed"}}
-                    )
             except Exception as e:
-                print(f"Project analysis failed for {url}: {e}")
+                print(f"Project analysis for {url} failed: {e}")
+    
+    await users_col.update_one({"user_id": user_id}, {"$set": {"project_analysis_status": "completed"}})
 
 @router.post("/save-session")
 async def save_reg_session(session_id: str, data: dict):
@@ -106,8 +125,7 @@ async def save_reg_session(session_id: str, data: dict):
 async def get_reg_session(session_id: str):
     """Retrieves partial registration data from Redis."""
     data = r_client.get(f"reg_session:{session_id}")
-    if not data:
-        return {}
+    if not data: return {}
     return json.loads(data)
 
 @router.get("/validate")
@@ -116,9 +134,25 @@ async def validate_field(field: str, value: str):
     users_col = get_collection("users")
     if field not in ["username", "email", "phone_number"]:
         return {"available": True}
-    
     existing = await users_col.find_one({field: value})
     return {"available": existing is None}
+
+@router.get("/{user_id}/analysis-progress")
+async def get_analysis_progress(user_id: str):
+    """Tracks Project analysis progress."""
+    users_col = get_collection("users")
+    user = await users_col.find_one({"user_id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    status = user.get("project_analysis_status", "pending")
+    is_done = (status == "completed")
+    
+    return {
+        "status": status,
+        "progress": 100 if is_done else 50,
+        "message": "Initial baseline established!" if is_done else "Performing Deep Semantic Audit on Repositories..."
+    }
 
 @router.get("/{user_id}", response_model=UserProfileResponse)
 async def get_user_profile(user_id: str):
@@ -130,68 +164,37 @@ async def get_user_profile(user_id: str):
 
 @router.post("/hardware-lock")
 async def hardware_lock(extension_id: str, machine_id: str):
-    """
-    Performs the hardware handshake. Locks an extension_id to a specific machine_id.
-    """
     whitelist_col = get_collection("whitelist")
     entry = await whitelist_col.find_one({"extension_id": extension_id, "is_active": True})
-    
     if not entry:
-        raise HTTPException(status_code=401, detail="Extension ID not found or inactive")
+        raise HTTPException(status_code=401, detail="Extension ID not found")
     
-    # Trust on First Use (TOFU)
     if entry.get("machine_id") is None:
-        await whitelist_col.update_one(
-            {"extension_id": extension_id},
-            {"$set": {"machine_id": machine_id, "locked_at": datetime.utcnow()}}
-        )
-        return {"status": "locked", "message": "Hardware successfully bound to this twin."}
+        await whitelist_col.update_one({"extension_id": extension_id}, {"$set": {"machine_id": machine_id, "locked_at": datetime.utcnow()}})
+        return {"status": "locked"}
     
-    # Verification
     if entry["machine_id"] != machine_id:
-        raise HTTPException(status_code=403, detail="Hardware Mismatch: This extension ID is locked to another device.")
-    
-    return {"status": "verified", "message": "Connection authenticated."}
+        raise HTTPException(status_code=403, detail="Hardware Mismatch")
+    return {"status": "verified"}
 
 @router.post("/validate-extension")
 async def validate_extension(extension_id: str, machine_id: str):
-    """Checks if an extension_id is valid and matches the locked machine_id."""
     whitelist_col = get_collection("whitelist")
-    entry = await whitelist_col.find_one({
-        "extension_id": extension_id, 
-        "machine_id": machine_id, 
-        "is_active": True
-    })
-    
+    entry = await whitelist_col.find_one({"extension_id": extension_id, "machine_id": machine_id, "is_active": True})
     if not entry:
-        raise HTTPException(status_code=401, detail="Invalid extension ID or hardware mismatch")
+        raise HTTPException(status_code=401, detail="Invalid extension or hardware")
     
     users_col = get_collection("users")
     user = await users_col.find_one({"extension_id": extension_id})
     return {"user_id": user["user_id"], "name": user["name"]}
 
-@router.get("/by-role/{role}")
-async def get_users_by_role(role: str):
-    """Fetches all active users of a specific role."""
-    users_col = get_collection("users")
-    
-    # Simple logic: Senior/Lead/Principal are PMs, others are Developers
-    if role == "project_manager":
-        users = await users_col.find({"experience_level": {"$in": ["Senior", "Lead", "Principal"]}}).to_list(100)
-    else:
-        users = await users_col.find({"experience_level": {"$in": ["Intern", "Junior", "Mid"]}}).to_list(100)
-        
-    return [{"user_id": u["user_id"], "name": u["name"], "username": u["username"], "manager_id": u.get("manager_id")} for u in users]
-
 @router.post("/assign-manager")
 async def assign_manager(developer_id: str, manager_id: str):
-    """Binds a developer to a specific Project Manager."""
     users_col = get_collection("users")
-    result = await users_col.update_one(
-        {"user_id": developer_id},
-        {"$set": {"manager_id": manager_id}}
-    )
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Developer not found or assignment unchanged")
+    await users_col.update_one({"user_id": developer_id}, {"$set": {"manager_id": manager_id}})
     
-    return {"status": "success", "message": f"Developer {developer_id} assigned to Manager {manager_id}"}
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(f"{THG_URL}/api/v1/thg/thg/link-manager-dev", json={"manager_id": manager_id, "dev_id": developer_id})
+    except Exception: pass
+    return {"status": "success"}

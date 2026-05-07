@@ -3,6 +3,9 @@ ADT Audit Logger — Centralized audit logging for all THG mutations.
 Every service calls this to log changes before/after THG updates.
 """
 import logging
+import os
+import redis
+import json
 from datetime import datetime
 from typing import Optional, Dict, Any
 
@@ -21,6 +24,8 @@ class AuditLogger:
             db: Motor database instance from shared.database.mongo
         """
         self._collection = db["audit_log"]
+        # Redis for Real-time WebSocket broadcasting
+        self.r_client = redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True)
 
     async def log(
         self,
@@ -57,10 +62,18 @@ class AuditLogger:
             "timestamp": datetime.utcnow(),
         }
         result = await self._collection.insert_one(doc)
-        logger.info(
-            f"AUDIT: [{action}] user={user_id} source={source} "
-            f"id={result.inserted_id}"
-        )
+        # 2. Broadcast via Redis
+        try:
+            self.r_client.publish("audit_logs", json.dumps({
+                "id": str(result.inserted_id),
+                "user_id": user_id,
+                "action": action,
+                "source": source,
+                "timestamp": doc["timestamp"].isoformat()
+            }))
+        except:
+            pass
+
         return str(result.inserted_id)
 
     async def log_thg_update(

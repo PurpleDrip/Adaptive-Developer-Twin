@@ -15,18 +15,19 @@ class BatchProcessor:
         self.scheduler = AsyncIOScheduler()
         self.fusion_url = os.getenv("FUSION_URL", "http://fusion-service:8000")
         self.thg_url = os.getenv("THG_URL", "http://thg-service:8000")
-        self.batch_interval = int(os.getenv("BATCH_INTERVAL_MINUTES", 30))
+        self.batch_interval = int(os.getenv("BATCH_INTERVAL_MINUTES", 5))
 
     def start(self):
-        # Run every 30 minutes
+        # Run Micro-batching every 5 minutes for live signal extraction
         self.scheduler.add_job(self.process_batches, 'interval', minutes=self.batch_interval)
         self.scheduler.start()
 
     async def process_batches(self):
         """Main batch processing loop."""
-        if not await self._is_monitoring_window():
-            logger.info("Outside monitoring window or holiday. Skipping batch processing.")
-            return
+        # Note: Monitoring is now always on for office hardware. 
+        # Window checks are removed for continuous auditing.
+        
+        logger.info("Starting micro-batch telemetry processing...")
 
         logger.info("Starting batch telemetry processing...")
         db_raw = get_collection("telemetry_raw")
@@ -120,36 +121,4 @@ class BatchProcessor:
 
         logger.info(f"Batch processing complete for {len(user_groups)} users.")
 
-    async def _is_monitoring_window(self) -> bool:
-        """Checks if current time is within 9am-6pm and not a holiday."""
-        db_config = get_collection("system_config")
-        config = await db_config.find_one({"key": "global_config"})
-        
-        # Defaults
-        start_str = config.get("monitoring_window_start", "09:00") if config else "09:00"
-        end_str = config.get("monitoring_window_end", "18:00") if config else "18:00"
-        holidays = config.get("holidays", []) if config else []
-        is_paused = config.get("is_monitoring_paused", False) if config else False
 
-        if is_paused:
-            return False
-
-        now = datetime.now()
-        today_str = now.strftime("%Y-%m-%d")
-        
-        # Holiday check
-        for h in holidays:
-            if h["date"] == today_str:
-                if not h.get("is_half_day"):
-                    return False
-                # If half day, check if monitoring has resumed
-                resume_time_str = h.get("half_day_end", "14:00")
-                resume_time = time.fromisoformat(resume_time_str)
-                if now.time() < resume_time:
-                    return False
-
-        # Window check
-        start_time = time.fromisoformat(start_str)
-        end_time = time.fromisoformat(end_str)
-        
-        return start_time <= now.time() <= end_time

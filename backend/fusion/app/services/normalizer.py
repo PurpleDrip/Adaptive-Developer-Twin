@@ -95,15 +95,21 @@ class Normalizer:
 
     @classmethod
     def extract_profile_signals(cls, profile_data: Dict[str, Any]) -> Dict[str, float]:
-        """Normalize resume and project evidence into domain signals."""
-        signals = {}
+        """Normalize project evidence and direct skill tags into domain signals."""
+        signals = {d: 0.0 for d in cls.FILE_DOMAIN_MAP}
+        
+        # 1. Direct Skill Tags (Legacy/Manual)
         for skill in profile_data.get("resume_skills", []):
-            signals[skill.lower()] = 0.7
+            key = skill.lower()
+            if key in signals:
+                signals[key] = 0.7
 
+        # 2. Project-based evidence (Verifiable Code Audit)
         for project in profile_data.get("projects", []):
             quality = project.get("quality_score", 0.5)
             for skill in project.get("skills", []):
                 key = skill.lower()
-                signals[key] = max(signals.get(key, 0), quality)
+                if key in signals:
+                    signals[key] = max(signals[key], quality)
 
         return signals
