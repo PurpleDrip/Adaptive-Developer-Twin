@@ -17,7 +17,7 @@ export const LiveAuditHUD: React.FC = () => {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        const ws = new WebSocket(`ws://${window.location.hostname}:8007/api/v1/monitoring/ws/audit`);
+        const ws = new WebSocket(`ws://127.0.0.1:8007/api/v1/monitoring/ws/audit`);
 
         ws.onopen = () => setIsConnected(true);
         ws.onmessage = (event) => {

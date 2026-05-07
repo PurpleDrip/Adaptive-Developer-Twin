@@ -1,6 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import monitoring, holidays
+from app.routers import monitoring
 from shared.database.mongo import connect_mongo, close_mongo
 import redis
 import os
@@ -49,7 +49,6 @@ async def shutdown_db_client():
     await close_mongo()
 
 app.include_router(monitoring.router, prefix="/api/v1/monitoring", tags=["monitoring"])
-app.include_router(holidays.router, prefix="/api/v1/monitoring/holidays", tags=["holidays"])
 
 @app.get("/api/v1/monitoring/health")
 async def health():

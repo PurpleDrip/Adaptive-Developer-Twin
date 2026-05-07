@@ -126,8 +126,10 @@ services:
       - "8007:8000"
     environment:
       MONGO_URI: ${MONGO_URI}
+      REDIS_URL: redis://redis:6379
     depends_on:
       - mongodb
+      - redis
 
   task-service:
     build:

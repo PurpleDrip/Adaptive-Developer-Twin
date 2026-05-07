@@ -10,7 +10,7 @@ from shared.models.user import UserRegistrationDTO, UserDocument, UserProfileRes
 from shared.database.mongo import get_collection
 from passlib.context import CryptContext
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(tags=["users"])
 FUSION_URL = os.getenv("FUSION_URL", "http://fusion-service:8000")
 THG_URL = os.getenv("THG_URL", "http://thg-service:8000")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -18,6 +18,23 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 r_client = redis.from_url(REDIS_URL, decode_responses=True)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+@router.get("/analysis-status/{user_id}")
+async def get_analysis_progress(user_id: str):
+    """Tracks Project analysis progress."""
+    users_col = get_collection("users")
+    user = await users_col.find_one({"user_id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    status = user.get("project_analysis_status", "pending")
+    is_done = (status == "completed")
+    
+    return {
+        "status": status,
+        "progress": 100 if is_done else 50,
+        "message": "Initial baseline established!" if is_done else "Performing Deep Semantic Audit on Repositories..."
+    }
 
 @router.post("/login")
 async def login_user(dto: LoginDTO):
@@ -136,23 +153,6 @@ async def validate_field(field: str, value: str):
         return {"available": True}
     existing = await users_col.find_one({field: value})
     return {"available": existing is None}
-
-@router.get("/{user_id}/analysis-progress")
-async def get_analysis_progress(user_id: str):
-    """Tracks Project analysis progress."""
-    users_col = get_collection("users")
-    user = await users_col.find_one({"user_id": user_id})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    status = user.get("project_analysis_status", "pending")
-    is_done = (status == "completed")
-    
-    return {
-        "status": status,
-        "progress": 100 if is_done else 50,
-        "message": "Initial baseline established!" if is_done else "Performing Deep Semantic Audit on Repositories..."
-    }
 
 @router.get("/{user_id}", response_model=UserProfileResponse)
 async def get_user_profile(user_id: str):

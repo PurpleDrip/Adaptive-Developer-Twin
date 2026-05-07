@@ -3,3 +3,5 @@ uvicorn
 pydantic
 httpx
 motor
+redis
+websockets

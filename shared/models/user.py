@@ -14,12 +14,6 @@ class UserRegistrationDTO(BaseModel):
     strong_domains: List[str] = Field(..., min_length=1, max_length=10)
     experience_level: str = Field(..., pattern=r'^(Intern|Junior|Mid|Senior|Lead|Principal)$')
     github_project_urls: Optional[List[str]] = Field(default=None, max_length=5)
-    resume_url: Optional[str] = Field(None, description="URL or Base64 of the uploaded resume")
-
-class LoginDTO(BaseModel):
-    """Payload for user login."""
-    username: str
-    password: str
 
     @field_validator('email')
     @classmethod
@@ -28,6 +22,11 @@ class LoginDTO(BaseModel):
         if not re.match(pattern, v):
             raise ValueError('Invalid email format')
         return v.lower()
+
+class LoginDTO(BaseModel):
+    """Payload for user login."""
+    username: str
+    password: str
 
 class UserDocument(BaseModel):
     """MongoDB document structure for users collection."""
@@ -43,8 +42,6 @@ class UserDocument(BaseModel):
     machine_id: Optional[str] = None
     last_known_state_hash: Optional[str] = None
     last_sync_at: Optional[datetime] = None
-    resume_url: Optional[str] = None
-    resume_summary: Optional[str] = None
 
     @staticmethod
     def create(dto: UserRegistrationDTO, user_id: str, extension_id: str) -> dict:
@@ -60,8 +57,6 @@ class UserDocument(BaseModel):
             "strong_domains": dto.strong_domains,
             "experience_level": dto.experience_level,
             "github_project_urls": dto.github_project_urls or [],
-            "resume_url": dto.resume_url,
-            "resume_summary": None, # Populated by PKE service
             "role": "developer",
             "registered_at": datetime.utcnow(),
             "is_active": True,

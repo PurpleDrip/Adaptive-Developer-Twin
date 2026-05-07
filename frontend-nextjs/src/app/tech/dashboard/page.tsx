@@ -21,7 +21,7 @@ import '@xyflow/react/dist/style.css';
 import { LiveAuditHUD } from '@/components/tech/LiveAuditHUD';
 import { DataExplorer } from '@/components/tech/DataExplorer';
 
-const GATEWAY_URL = "http://localhost:8000/api/v1";
+const GATEWAY_URL = "http://127.0.0.1:8000/api/v1";
 
 // --- Custom XYFlow Components ---
 const SystemXNode = ({ data }: any) => (
@@ -89,26 +89,9 @@ const initialEdges = [
 export default function TechSupportDashboard() {
     const [activeTab, setActiveTab] = useState<'infra' | 'logs' | 'data'>('infra');
     const [loading, setLoading] = useState(true);
-    const [config, setConfig] = useState<any>({ is_monitoring_paused: false, remote_access_override: false });
-
     useEffect(() => {
-        fetchConfig();
         setTimeout(() => setLoading(false), 800);
     }, []);
-
-    const fetchConfig = async () => {
-        try {
-            const resp = await axios.get('http://localhost:8007/api/v1/monitoring/holidays/config');
-            setConfig(resp.data);
-        } catch (err) { console.error(err); }
-    };
-
-    const updateConfig = async (updates: any) => {
-        try {
-            await axios.post('http://localhost:8007/api/v1/monitoring/holidays/config/update', { ...config, ...updates });
-            setConfig({ ...config, ...updates });
-        } catch (err) { alert('Failed to update protocol'); }
-    };
 
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center font-mono text-cyan-500 animate-pulse uppercase tracking-[0.5em]">System_Initializing...</div>;
 
@@ -143,7 +126,7 @@ export default function TechSupportDashboard() {
             <main className="h-[calc(100vh-200px)] animate-fade">
                 {activeTab === 'infra' && (
                     <ReactFlowProvider>
-                        <InfrastructureView config={config} updateConfig={updateConfig} />
+                        <InfrastructureView />
                     </ReactFlowProvider>
                 )}
                 {activeTab === 'logs' && <LiveAuditHUD />}
@@ -153,7 +136,7 @@ export default function TechSupportDashboard() {
     );
 }
 
-function InfrastructureView({ config, updateConfig }: any) {
+function InfrastructureView() {
     const getInitialLayout = () => {
         if (typeof window === 'undefined') return initialNodes;
         const saved = localStorage.getItem('ADT_NEXUS_LAYOUT');

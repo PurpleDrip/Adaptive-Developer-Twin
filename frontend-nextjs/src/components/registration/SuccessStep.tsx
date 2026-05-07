@@ -10,9 +10,12 @@ interface SuccessStepProps {
 export const SuccessStep: React.FC<SuccessStepProps> = ({ ids }) => {
     const router = useRouter();
     const [isDone, setIsDone] = React.useState(false);
+    const [copied, setCopied] = React.useState(false);
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
     };
 
     return (
@@ -40,13 +43,21 @@ export const SuccessStep: React.FC<SuccessStepProps> = ({ ids }) => {
                 {isDone && (
                     <div className="animate-fade">
                         <div className="bg-zinc-900/50 p-6 rounded-xl border border-zinc-800 mb-8 text-left">
-                            <p className="text-[10px] font-bold text-blue-500 mb-4 uppercase tracking-[0.3em]">Connection Credentials</p>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="text-[10px] text-gray-500 block mb-1 uppercase font-bold">Extension ID (Required)</label>
-                                    <div className="flex justify-between items-center bg-black p-3 rounded border border-zinc-800 group hover:border-purple-500/50 transition-all">
-                                        <code className="text-purple-400 font-mono text-sm">{ids.extensionId}</code>
-                                        <Copy size={16} className="text-gray-500 cursor-pointer hover:text-white" onClick={() => copyToClipboard(ids.extensionId)} />
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="text-[10px] text-gray-500 block uppercase font-bold tracking-widest">Connection Credential</label>
+                                        {copied && <span className="text-[10px] text-green-500 font-bold animate-pulse">COPIED TO CLIPBOARD</span>}
+                                    </div>
+                                    <div 
+                                        className="flex justify-between items-center bg-black p-4 rounded-xl border border-zinc-800 group hover:border-blue-500/50 transition-all cursor-pointer active:scale-[0.98]" 
+                                        onClick={() => copyToClipboard(ids.extensionId)}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-2 h-2 rounded-full ${copied ? 'bg-green-500 animate-ping' : 'bg-blue-500'}`} />
+                                            <code className="text-blue-400 font-mono text-sm tracking-wider">{ids.extensionId}</code>
+                                        </div>
+                                        <Copy size={16} className={`transition-colors ${copied ? 'text-green-500' : 'text-zinc-500 group-hover:text-white'}`} />
                                     </div>
                                 </div>
                             </div>
@@ -62,18 +73,18 @@ export const SuccessStep: React.FC<SuccessStepProps> = ({ ids }) => {
                                     { step: 4, text: "Start coding to begin continuous mirroring" }
                                 ].map((item) => (
                                     <div key={item.step} className="flex gap-4 items-center">
-                                        <span className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-blue-400">{item.step}</span>
-                                        <p className="text-xs text-gray-300">{item.text}</p>
+                                        <span className="w-6 h-6 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-[10px] font-bold text-blue-500">{item.step}</span>
+                                        <p className="text-xs text-zinc-400">{item.text}</p>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        <a href="/downloads/adt-extension.vsix" className="btn-large mb-4 w-full flex items-center justify-center gap-2">
-                            <Download size={18} /> Download Extension
+                        <a href="/downloads/adt-extension.vsix" className="btn-large mb-4 w-full flex items-center justify-center gap-2 group cursor-pointer">
+                            <Download size={18} className="group-hover:translate-y-0.5 transition-transform" /> Download Extension
                         </a>
                         
-                        <button className="btn-text mx-auto mt-4" onClick={() => router.push('/login?role=developer')}>
+                        <button className="btn-text mx-auto mt-4 cursor-pointer hover:text-white" onClick={() => router.push('/login?role=developer')}>
                             Proceed to Live Mirror <ArrowRight size={14} className="ml-1" />
                         </button>
                     </div>

@@ -20,7 +20,7 @@ async def startup_db_client():
 async def shutdown_db_client():
     await close_mongo()
 
-app.include_router(users.router, prefix="/api/v1/auth", tags=["users"])
+app.include_router(users.router, prefix="/api/v1/auth/users", tags=["users"])
 app.include_router(admin.router, prefix="/api/v1/auth/admin", tags=["admin"])
 app.include_router(connect.router, prefix="/api/v1/auth/connect", tags=["connect"])
 
