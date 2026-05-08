@@ -15,18 +15,36 @@ class BatchProcessor:
         self.scheduler = AsyncIOScheduler()
         self.fusion_url = os.getenv("FUSION_URL", "http://fusion-service:8000")
         self.thg_url = os.getenv("THG_URL", "http://thg-service:8000")
+        self.monitoring_url = os.getenv("MONITORING_URL", "http://127.0.0.1:8007")
         self.batch_interval = int(os.getenv("BATCH_INTERVAL_MINUTES", 5))
 
     def start(self):
-        # Run Micro-batching every 5 minutes for live signal extraction
-        self.scheduler.add_job(self.process_batches, 'interval', minutes=self.batch_interval)
+        self.scheduler.add_job(
+            self.process_batches, 'interval',
+            minutes=self.batch_interval,
+            id='batch_processor'
+        )
         self.scheduler.start()
+
+    async def _fetch_and_apply_config(self):
+        """Fetches system config and reschedules the job if interval changed."""
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(f"{self.monitoring_url}/api/v1/monitoring/system-config")
+                if resp.status_code == 200:
+                    new_interval = int(resp.json().get("batch_interval_minutes", self.batch_interval))
+                    if new_interval != self.batch_interval:
+                        self.batch_interval = new_interval
+                        job = self.scheduler.get_job('batch_processor')
+                        if job:
+                            job.reschedule(trigger='interval', minutes=new_interval)
+                            logger.info(f"[BATCH] Interval rescheduled to {new_interval} min from system config")
+        except Exception as e:
+            logger.warning(f"[BATCH] Could not fetch system config: {e}")
 
     async def process_batches(self):
         """Main batch processing loop."""
-        # Note: Monitoring is now always on for office hardware. 
-        # Window checks are removed for continuous auditing.
-        
+        await self._fetch_and_apply_config()
         logger.info("Starting micro-batch telemetry processing...")
 
         logger.info("Starting batch telemetry processing...")

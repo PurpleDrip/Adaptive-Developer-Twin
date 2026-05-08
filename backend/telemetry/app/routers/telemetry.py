@@ -8,6 +8,7 @@ from shared.database.mongo import get_collection
 
 router = APIRouter(prefix="/telemetry", tags=["telemetry"])
 AUTH_URL = os.getenv("AUTH_URL", "http://auth-service:8000")
+FUSION_URL = os.getenv("FUSION_URL", "http://fusion-service:8000")
 
 @router.post("/handshake")
 async def telemetry_handshake(extension_id: str, current_hash: str, machine_id: str):
@@ -52,6 +53,21 @@ async def ingest_telemetry(data: TelemetryIngestDTO, request: Request):
     # Update SHEC state
     users_col = get_collection("users")
     await users_col.update_one({"user_id": resolved_user_id}, {"$set": {"last_sync_at": datetime.utcnow()}})
+
+    # INITIAL sync: forward workspace snapshot to Fusion for deep baseline audit
+    if data.sync_type == SyncType.INITIAL and data.workspace_snapshot_url:
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                await client.post(
+                    f"{FUSION_URL}/api/v1/fusion/fusion/deep-audit",
+                    json={
+                        "user_id": resolved_user_id,
+                        "workspace_snapshot_url": data.workspace_snapshot_url
+                    }
+                )
+        except Exception as e:
+            # Non-blocking — deep audit is best-effort
+            pass
 
     return {"status": "ingested", "timestamp": datetime.utcnow().isoformat()}
 

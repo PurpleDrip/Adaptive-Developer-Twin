@@ -8,9 +8,41 @@ from app.schemas.fusion import SkillUpdateDTO, FusionInputDTO, InvestorAssessmen
 from fastapi import APIRouter, HTTPException
 from typing import Dict, List, Any
 import os
+import base64
+import zipfile
+import io
+import httpx
+import logging
+
+logger = logging.getLogger("fusion.router")
 
 router = APIRouter(prefix="/fusion", tags=["fusion"])
 THG_URL = os.getenv("THG_URL", "http://thg-service:8000")
+
+
+def _infer_skills_from_files(file_list: List[str]) -> Dict[str, float]:
+    """Infers skill signals from file extensions and directory names."""
+    signals: Dict[str, float] = {
+        "backend": 0.0, "frontend": 0.0, "devops": 0.0,
+        "ml": 0.0, "database": 0.0, "testing": 0.0, "security": 0.0
+    }
+    for fname in file_list:
+        lower = fname.lower()
+        if any(lower.endswith(e) for e in ['.py', '.go', '.java', '.rs', '.rb', '.php', '.cs']):
+            signals["backend"] = min(1.0, signals["backend"] + 0.05)
+        if any(lower.endswith(e) for e in ['.tsx', '.jsx', '.vue', '.html', '.css', '.scss', '.svelte']):
+            signals["frontend"] = min(1.0, signals["frontend"] + 0.05)
+        if any(p in lower for p in ['dockerfile', 'docker-compose', '.yaml', '.yml', 'k8s', '.tf', 'terraform', 'nginx']):
+            signals["devops"] = min(1.0, signals["devops"] + 0.05)
+        if any(p in lower for p in ['model', 'train', 'neural', '.ipynb', 'dataset', 'torch', 'sklearn']):
+            signals["ml"] = min(1.0, signals["ml"] + 0.05)
+        if any(p in lower for p in ['test_', '_test', '.spec.', '__tests__', 'cypress', 'jest']):
+            signals["testing"] = min(1.0, signals["testing"] + 0.05)
+        if any(p in lower for p in ['.sql', 'migration', 'schema', 'prisma', 'mongo', 'redis', 'postgres']):
+            signals["database"] = min(1.0, signals["database"] + 0.05)
+        if any(p in lower for p in ['auth', 'jwt', 'oauth', 'ssl', 'tls', 'encrypt', 'hash', 'csrf']):
+            signals["security"] = min(1.0, signals["security"] + 0.05)
+    return signals
 
 def _build_fusion_result(user_id: str, data: FusionInputDTO) -> Dict[str, Any]:
     detector = AnomalyDetector()
@@ -131,3 +163,75 @@ async def explain_user(user_id: str):
 @router.post("/{user_id}/run", status_code=201)
 async def run_fusion(user_id: str, data: FusionInputDTO):
     return _build_fusion_result(user_id, data)
+
+
+@router.post("/deep-audit", status_code=202)
+async def deep_audit(data: Dict[str, Any]):
+    """
+    Codebase-Aware Twin baseline: unzips workspace snapshot,
+    infers skill signals from file structure + CodeBERT sampling,
+    then pushes baseline strengths to THG.
+    """
+    user_id = data.get("user_id")
+    snapshot_b64 = data.get("workspace_snapshot_url")
+
+    if not user_id or not snapshot_b64:
+        raise HTTPException(400, "user_id and workspace_snapshot_url are required")
+
+    try:
+        zip_bytes = base64.b64decode(snapshot_b64)
+        zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
+        file_list = zf.namelist()
+    except Exception as e:
+        logger.error(f"[DEEP-AUDIT] Failed to decode snapshot for {user_id}: {e}")
+        raise HTTPException(400, f"Invalid workspace snapshot: {e}")
+
+    # 1. Structural analysis
+    structural_signals = _infer_skills_from_files(file_list)
+
+    # 2. Sample up to 15 text files for CodeBERT semantic analysis
+    sampled_code = ""
+    sample_count = 0
+    text_extensions = {'.py', '.ts', '.tsx', '.js', '.jsx', '.go', '.java', '.rs', '.rb', '.cs', '.sql', '.yaml', '.yml', '.md'}
+    for fname in file_list:
+        if sample_count >= 15:
+            break
+        if any(fname.lower().endswith(ext) for ext in text_extensions):
+            try:
+                content = zf.read(fname).decode('utf-8', errors='ignore')[:300]
+                sampled_code += content + "\n"
+                sample_count += 1
+            except Exception:
+                pass
+
+    analyzer = CodeBERTAnalyzer.get_instance()
+    semantic_signals = analyzer.analyze_code(sampled_code) if sampled_code else {}
+
+    # 3. Merge: take max of structural and semantic signals
+    merged: Dict[str, float] = {}
+    all_skills = set(structural_signals) | {k for k in semantic_signals if not k.startswith("_")}
+    for skill in all_skills:
+        merged[skill] = round(max(structural_signals.get(skill, 0.0), semantic_signals.get(skill, 0.0)), 3)
+
+    # 4. Push baseline to THG (only skills with meaningful signal)
+    pushed = {}
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        for skill, strength in merged.items():
+            if strength > 0.05:
+                resp = await client.post(f"{THG_URL}/api/v1/thg/update", json={
+                    "dev_id": user_id,
+                    "skill_name": skill,
+                    "strength": strength,
+                    "confidence": 0.55
+                })
+                if resp.status_code in (200, 201):
+                    pushed[skill] = strength
+
+    logger.info(f"[DEEP-AUDIT] {user_id}: {len(file_list)} files → {len(pushed)} skills set as baseline")
+    return {
+        "status": "baseline_established",
+        "user_id": user_id,
+        "files_scanned": len(file_list),
+        "sampled_for_codebert": sample_count,
+        "baseline_skills": pushed
+    }

@@ -7,6 +7,25 @@ from shared.services.audit_logger import AuditLogger
 
 router = APIRouter()
 
+_DEFAULT_CONFIG = {
+    "heartbeat_interval_seconds": 30,
+    "batch_interval_minutes": 5,
+}
+
+@router.get("/system-config")
+async def get_system_config():
+    """Returns runtime configuration used by the extension and batch processor."""
+    col = get_collection("system_config")
+    doc = await col.find_one({"_id": "global"}, {"_id": 0})
+    return doc if doc else _DEFAULT_CONFIG
+
+@router.put("/system-config")
+async def update_system_config(config: Dict[str, Any]):
+    """Tech staff updates runtime configuration."""
+    col = get_collection("system_config")
+    await col.update_one({"_id": "global"}, {"$set": config}, upsert=True)
+    return {"status": "updated", "config": config}
+
 @router.get("/audit-log")
 async def get_audit_trail(user_id: str = None, action: str = None, limit: int = 100):
     """

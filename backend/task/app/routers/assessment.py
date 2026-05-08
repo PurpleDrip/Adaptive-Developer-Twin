@@ -93,3 +93,11 @@ async def get_active_assessments():
     results = await cursor.to_list(length=5)
     logger.info(f"[ASSESSMENT] Returned {len(results)} active assessments")
     return results
+
+@router.get("/submissions/{user_id}")
+async def get_user_submissions(user_id: str):
+    """Returns all test submissions for a given developer."""
+    db_submissions = get_collection("test_submissions")
+    cursor = db_submissions.find({"user_id": user_id}, {"_id": 0}).sort("verified_at", -1)
+    results = await cursor.to_list(length=100)
+    return results

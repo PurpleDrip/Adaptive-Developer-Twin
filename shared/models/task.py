@@ -18,7 +18,7 @@ class TaskCreateDTO(BaseModel):
 
 class TaskAssignDTO(BaseModel):
     """Assign a task to a developer."""
-    task_id: str
+    task_id: Optional[str] = None  # Also in URL path; body field is optional
     assigned_to: str = Field(..., description="user_id of developer")
     assigned_by: str = Field(..., description="user_id of senior dev")
 

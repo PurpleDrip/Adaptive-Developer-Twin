@@ -6,101 +6,118 @@ let sender: TelemetrySender;
 let statusBarItem: vscode.StatusBarItem;
 
 export async function activate(context: vscode.ExtensionContext) {
-    console.log('ADT Extension is now active.');
-    
-    // 1. Initialize Telemetry
+    vscode.window.showWarningMessage('ADT Extension activated.');
+
+    // 1. Show machine ID for dev-phase hardware locking
+    const mid = vscode.env.machineId;
+    vscode.window.showWarningMessage(`[ADT Dev] Machine ID: ${mid}`);
+
+    // 2. Initialize Telemetry Sender
     sender = new TelemetrySender(context);
     sender.start();
 
-    // 2. Proactive Registration Check
+    // 3. Setup Status Bar
     const extensionId = await context.secrets.get('adt.extensionId');
+    statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+    statusBarItem.text = extensionId ? '$(pulse) ADT: Connected' : '$(alert) ADT: Not Connected';
+    statusBarItem.tooltip = extensionId ? 'ADT is monitoring your twin' : 'Click to connect your Extension ID';
+    statusBarItem.command = 'adt.connectAccount';
+    statusBarItem.show();
+    context.subscriptions.push(statusBarItem);
+
+    // 4. Prompt to connect if no Extension ID stored
     if (!extensionId) {
-        vscode.window.showInformationMessage(
-            "Welcome to ADT! Please connect your twin to start monitoring.",
-            "Connect Now"
+        vscode.window.showWarningMessage(
+            'ADT: No Extension ID found. Connect your twin to start monitoring.',
+            'Connect Now'
         ).then(selection => {
-            if (selection === "Connect Now") {
+            if (selection === 'Connect Now') {
                 vscode.commands.executeCommand('adt.connectAccount');
             }
         });
     }
 
-    // 3. Setup Status Bar
-    statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-    statusBarItem.text = extensionId ? "$(pulse) ADT: Connected" : "$(alert) ADT: Disconnected";
-    statusBarItem.tooltip = extensionId ? "ADT is monitoring your twin" : "Please connect your Extension ID";
-    statusBarItem.show();
-    context.subscriptions.push(statusBarItem);
-
-    // 4. Register Handshake Command
-    let disposableConnect = vscode.commands.registerCommand('adt.connectAccount', async () => {
-        const extensionId = await vscode.window.showInputBox({ 
-            prompt: "Enter your ADT Extension ID (from the registration page)",
-            placeHolder: "ADT-XXXXXX",
-            ignoreFocusOut: true
+    // 5. Register Connect Command
+    const disposableConnect = vscode.commands.registerCommand('adt.connectAccount', async () => {
+        const inputId = await vscode.window.showInputBox({
+            prompt: 'Enter your ADT Extension ID (from the web registration page)',
+            placeHolder: 'ADT-XXXXXX',
+            ignoreFocusOut: true,
+            validateInput: (v) => v && v.trim().length > 0 ? null : 'Extension ID cannot be empty'
         });
 
-        if (!extensionId) return;
+        if (!inputId) return;
 
         const config = vscode.workspace.getConfiguration('adt');
-        const gatewayUrl = config.get<string>('gatewayUrl');
-        const mid = vscode.env.machineId;
+        const gatewayUrl = config.get<string>('gatewayUrl') || 'http://127.0.0.1:8000';
+        const machineId = vscode.env.machineId;
 
-        vscode.window.withProgress({
+        await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
-            title: "ADT: Performing Hardware Handshake...",
+            title: 'ADT: Performing Hardware Handshake…',
             cancellable: false
         }, async () => {
             try {
-                const resp = await axios.post(`${gatewayUrl}/api/v1/auth/users/hardware-lock?extension_id=${extensionId}&machine_id=${mid}`);
+                const resp = await axios.post(
+                    `${gatewayUrl}/api/v1/auth/users/hardware-lock`,
+                    null,
+                    { params: { extension_id: inputId.trim(), machine_id: machineId } }
+                );
 
-                if (resp.data.status === "locked" || resp.data.status === "verified") {
-                    await context.secrets.store('adt.extensionId', extensionId);
-                    
-                    vscode.window.showInformationMessage(`ADT: Handshake Success! Twin linked to this hardware.`);
-                    statusBarItem.text = "$(pulse) ADT: Connected";
-                    
+                if (resp.data.status === 'locked' || resp.data.status === 'verified') {
+                    await context.secrets.store('adt.extensionId', inputId.trim());
+                    statusBarItem.text = '$(pulse) ADT: Connected';
+                    vscode.window.showInformationMessage(
+                        `ADT: Hardware lock verified. Twin is now active for Machine ${machineId.slice(0, 8)}…`
+                    );
+                    // Restart telemetry with the new ID (triggers INITIAL sync)
                     sender.stop();
                     sender.start();
+                } else {
+                    vscode.window.showErrorMessage('ADT: Handshake rejected — unexpected server response.');
                 }
             } catch (e: any) {
-                vscode.window.showErrorMessage(`ADT Handshake Error: Invalid ID or Hardware Lock Violation.`);
+                const detail = e?.response?.data?.detail || e?.message || 'Unknown error';
+                vscode.window.showErrorMessage(`ADT: Handshake failed — ${detail}`);
             }
         });
     });
 
     context.subscriptions.push(disposableConnect);
 
-    // 5. Task Notification Listener (Polling every 5 minutes via ExtensionID)
+    // 6. Task Notification Poller (every 5 minutes)
     setInterval(async () => {
-        const extensionId = await context.secrets.get('adt.extensionId');
-        const config = vscode.workspace.getConfiguration('adt');
-        const gatewayUrl = config.get<string>('gatewayUrl');
+        const eid = await context.secrets.get('adt.extensionId');
+        if (!eid) return;
 
-        if (!extensionId) return;
+        const config = vscode.workspace.getConfiguration('adt');
+        const gatewayUrl = config.get<string>('gatewayUrl') || 'http://127.0.0.1:8000';
 
         try {
-            const mid = vscode.env.machineId;
-            // Updated to use extension_id and machine_id for hardware lock enforcement
-            const resp = await axios.get(`${gatewayUrl}/api/v1/task/tasks/user-by-extension/${extensionId}`, {
-                params: { machine_id: mid }
-            });
-            const tasks = resp.data;
-            const openTasks = tasks.filter((t: any) => t.status === "assigned");
-            
+            const resp = await axios.get(
+                `${gatewayUrl}/api/v1/task/tasks/user-by-extension/${eid}`,
+                { params: { machine_id: vscode.env.machineId } }
+            );
+            const openTasks = (resp.data || []).filter((t: any) => t.status === 'assigned');
             if (openTasks.length > 0) {
-                vscode.window.showInformationMessage(`ADT: You have ${openTasks.length} pending tasks assigned!`, "View Tasks").then(selection => {
-                    if (selection === "View Tasks") {
-                        vscode.env.openExternal(vscode.Uri.parse("http://127.0.0.1:3000/dashboard"));
+                vscode.window.showInformationMessage(
+                    `ADT: ${openTasks.length} task(s) assigned to you.`,
+                    'View Tasks'
+                ).then(sel => {
+                    if (sel === 'View Tasks') {
+                        vscode.env.openExternal(vscode.Uri.parse('http://127.0.0.1:3000/dashboard'));
                     }
                 });
             }
         } catch (e) {
-            console.error("ADT: Failed to poll tasks");
+            vscode.window.showWarningMessage('ADT: Task poll failed.');
         }
     }, 300000);
 }
 
-export function deactivate() {
-    if (sender) sender.stop();
+export async function deactivate() {
+    if (sender) {
+        await sender.sendFinalSync();
+        sender.stop();
+    }
 }
