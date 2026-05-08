@@ -20,6 +20,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { LiveAuditHUD } from '@/components/tech/LiveAuditHUD';
 import { DataExplorer } from '@/components/tech/DataExplorer';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
 const GATEWAY_URL = "http://127.0.0.1:8000/api/v1";
 
@@ -93,7 +94,13 @@ export default function TechSupportDashboard() {
         setTimeout(() => setLoading(false), 800);
     }, []);
 
-    if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><div className="flex items-center gap-3 text-cyan-500"><Activity size={20} className="animate-pulse" /><span className="text-sm font-medium">Initializing system...</span></div></div>;
+    if (loading) return (
+        <LoadingScreen
+            message="Initializing system"
+            subtitle="Bootstrapping infra topology & audit pipeline"
+            accent="cyan"
+        />
+    );
 
     return (
         <div className="min-h-screen bg-black text-white p-8 font-sans">

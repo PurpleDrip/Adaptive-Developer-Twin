@@ -42,7 +42,10 @@ class BatchProcessor:
         # 2. Group by user_id
         user_groups = {}
         for record in unprocessed:
-            uid = record["user_id"]
+            uid = record.get("user_id")
+            if not uid:
+                logger.warning(f"Skipping telemetry record {record.get('_id')} due to missing user_id")
+                continue
             if uid not in user_groups:
                 user_groups[uid] = []
             user_groups[uid].append(record)

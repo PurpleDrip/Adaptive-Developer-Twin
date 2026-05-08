@@ -18,22 +18,33 @@ export const LiveAuditHUD: React.FC = () => {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        // Fetch Historical Logs first
+        // Single source: WebSocket. Initial seed is fetched once via REST,
+        // then live updates stream in. Each entry is keyed by id; the WS
+        // handler skips duplicates so the same audit event never renders twice.
+        let cancelled = false;
+
         axios.get('http://127.0.0.1:8007/api/v1/monitoring/audit-log')
-            .then(res => setLogs(res.data.map((l: any) => ({ ...l, id: l._id || l.id }))))
+            .then(res => {
+                if (cancelled) return;
+                const seeded = res.data.map((l: any) => ({ ...l, id: l._id || l.id }));
+                setLogs(seeded);
+            })
             .catch(err => console.error("Failed to fetch historical audit logs", err));
 
-        // Connect to Live WebSocket
         const ws = new WebSocket(`ws://127.0.0.1:8007/api/v1/monitoring/ws/audit`);
 
         ws.onopen = () => setIsConnected(true);
         ws.onmessage = (event) => {
             const newLog = JSON.parse(event.data);
-            setLogs(prev => [newLog, ...prev].slice(0, 50));
+            const incomingId = newLog.id || newLog._id;
+            setLogs(prev => {
+                if (prev.some(l => l.id === incomingId)) return prev;
+                return [{ ...newLog, id: incomingId }, ...prev].slice(0, 50);
+            });
         };
         ws.onclose = () => setIsConnected(false);
 
-        return () => ws.close();
+        return () => { cancelled = true; ws.close(); };
     }, []);
 
     useEffect(() => {

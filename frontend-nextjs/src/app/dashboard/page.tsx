@@ -6,9 +6,10 @@ import {
 } from 'recharts';
 import {
     Award, Zap, Clock, Code, Bell, CheckCircle,
-    Briefcase, User, ChevronRight, TrendingUp, Activity
+    Briefcase, User, ChevronRight, TrendingUp
 } from 'lucide-react';
 import { thgApi, authApi, taskApi, analyticsApi } from '@/lib/api';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
 export default function DeveloperDashboard() {
     const [skills, setSkills] = useState([]);
@@ -90,12 +91,11 @@ export default function DeveloperDashboard() {
     }, []);
 
     if (loading) return (
-        <div className="min-h-screen bg-black flex items-center justify-center">
-            <div className="flex items-center gap-3 text-blue-500">
-                <Activity size={20} className="animate-pulse" />
-                <span className="text-sm font-medium">Synchronizing your neural twin...</span>
-            </div>
-        </div>
+        <LoadingScreen
+            message="Synchronizing your neural twin"
+            subtitle="Pulling skills, telemetry & assignments"
+            accent="blue"
+        />
     );
 
     return (

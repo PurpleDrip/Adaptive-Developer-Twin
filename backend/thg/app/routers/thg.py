@@ -329,7 +329,7 @@ async def get_influence_ranking(session=Depends(get_neo4j_session)):
             YIELD nodeId, score
             MATCH (d:Developer) WHERE id(d) = nodeId
             RETURN d.id AS dev_id, d.name AS name, score
-            ORDER BY score DESC LIMIT 20
+            ORDER BY score DESC
         """)
         records = await result.data()
         if records:
@@ -344,9 +344,9 @@ async def get_influence_ranking(session=Depends(get_neo4j_session)):
         MATCH (d:Developer)
         OPTIONAL MATCH (d)-[r:HAS_SKILL]->(s:Skill)
         WITH d, count(s) AS skill_count, sum(r.strength) AS total_strength
-        RETURN d.id AS dev_id, d.name AS name, 
-               (skill_count * 0.5 + total_strength * 0.5) AS influence_score
-        ORDER BY influence_score DESC LIMIT 20
+        RETURN d.id AS dev_id, d.name AS name,
+               (skill_count * 0.5 + coalesce(total_strength, 0) * 0.5) AS influence_score
+        ORDER BY influence_score DESC
     """)
     records = await result.data()
     return [{"rank": i+1, "dev_id": r["dev_id"], "name": r["name"], "influence_score": round(r["influence_score"], 4)} 

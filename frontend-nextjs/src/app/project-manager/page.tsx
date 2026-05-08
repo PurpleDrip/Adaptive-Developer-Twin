@@ -2,11 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-    Users, Plus, Search, Briefcase, Activity, Sparkles, RotateCcw,
+    Users, Plus, Search, Briefcase, Sparkles, RotateCcw,
     LogOut, Mail, Clock, Star, Shield, FileQuestion, Trash2, CheckCircle,
     ChevronDown, ChevronUp
 } from 'lucide-react';
 import { authApi, taskApi, analyticsApi, assessmentApi } from '@/lib/api';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
 type QuestionDraft = {
     id: string;
@@ -133,6 +134,7 @@ export default function ProjectManagerDashboard() {
             });
             const taskId = createRes.data.task_id;
             await taskApi.assignTask(taskId, {
+                task_id: taskId,
                 assigned_to: devId,
                 assigned_by: session.user_id || 'system_mgr',
             });
@@ -232,12 +234,11 @@ export default function ProjectManagerDashboard() {
     );
 
     if (loading) return (
-        <div className="min-h-screen bg-black flex items-center justify-center">
-            <div className="flex items-center gap-3 text-blue-500">
-                <Activity size={20} className="animate-pulse" />
-                <span className="text-sm font-medium">Synchronizing team intel...</span>
-            </div>
-        </div>
+        <LoadingScreen
+            message="Synchronizing team intel"
+            subtitle="Loading squad, velocity & active tasks"
+            accent="blue"
+        />
     );
 
     return (
@@ -504,6 +505,9 @@ export default function ProjectManagerDashboard() {
                             const score = Math.round((c.match_score || 0) * 100);
                             const showXai = idx < 3 && c.explanation;
                             const exp = c.explanation;
+                            const squadMatch = devs.find(d => d.user_id === c.user_id);
+                            const existingTask = squadMatch?.current_task;
+                            const isBusy = !!existingTask;
                             return (
                                 <div
                                     key={c.user_id}
@@ -525,9 +529,27 @@ export default function ProjectManagerDashboard() {
                                             {c.name?.[0] || '?'}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-white truncate">{c.name || c.user_id}</p>
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-sm font-medium text-white truncate">{c.name || c.user_id}</p>
+                                                {isBusy ? (
+                                                    <span
+                                                        title={`Already assigned: ${existingTask?.title || existingTask?.task_id}`}
+                                                        className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[9px] font-bold uppercase tracking-wider"
+                                                    >
+                                                        <span className="w-1 h-1 rounded-full bg-amber-400 animate-pulse" />
+                                                        Busy
+                                                    </span>
+                                                ) : (
+                                                    <span className="shrink-0 px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400 text-[9px] font-bold uppercase tracking-wider">
+                                                        Available
+                                                    </span>
+                                                )}
+                                            </div>
                                             <p className="text-[10px] text-zinc-500 font-mono truncate">
                                                 {c.user_id} · {c.primary_skill || 'General'}
+                                                {isBusy && existingTask?.task_id && (
+                                                    <span className="text-amber-500/70"> · on {existingTask.task_id}</span>
+                                                )}
                                             </p>
                                         </div>
                                         <div className="text-right shrink-0 hidden sm:block">
