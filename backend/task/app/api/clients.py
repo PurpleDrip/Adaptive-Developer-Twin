@@ -1,5 +1,8 @@
 import httpx
 import os
+import logging
+
+logger = logging.getLogger("task-service.clients")
 
 ALLOCATION_URL = os.getenv("ALLOCATION_URL", "http://127.0.0.1:8009")
 THG_URL = os.getenv("THG_URL", "http://127.0.0.1:8008")
@@ -8,33 +11,44 @@ FUSION_URL = os.getenv("FUSION_URL", "http://127.0.0.1:8005")
 class AllocationClient:
     @staticmethod
     async def rank_candidates(task_id: str, title: str, description: str, required_skills: dict):
-        async with httpx.AsyncClient() as client:
-            try:
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(f"{ALLOCATION_URL}/api/v1/allocation/rank", json={
                     "task_id": task_id,
                     "title": title,
                     "description": description,
                     "required_skills": required_skills
                 })
-                return resp.json().get("candidates", []) if resp.status_code == 200 else []
-            except: return []
+                if resp.status_code == 200:
+                    candidates = resp.json().get("candidates", [])
+                    logger.info(f"[CSA-MATCHING] Ranked {len(candidates)} candidates for task {task_id}")
+                    return candidates
+                logger.warning(f"[CSA-MATCHING] Allocation engine returned {resp.status_code} for task {task_id}")
+                return []
+        except Exception as e:
+            logger.error(f"[CSA-MATCHING] Allocation engine unreachable for task {task_id}: {e}")
+            return []
 
 class THGClient:
     @staticmethod
     async def record_assignment(dev_id: str, task_id: str):
-        async with httpx.AsyncClient() as client:
-            try:
-                await client.post(f"{THG_URL}/api/v1/thg/record-assignment", json={
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(f"{THG_URL}/api/v1/thg/record-assignment", json={
                     "dev_id": dev_id, "task_id": task_id
                 })
-            except: pass
+                logger.info(f"[THG-SYNC] Assignment recorded: {dev_id} -> {task_id} (status={resp.status_code})")
+        except Exception as e:
+            logger.error(f"[THG-SYNC] Failed to record assignment {dev_id} -> {task_id}: {e}")
 
 class FusionClient:
     @staticmethod
     async def analyze_project(user_id: str, github_url: str):
-        async with httpx.AsyncClient() as client:
-            try:
-                await client.post(f"{FUSION_URL}/api/v1/fusion/analyze-project", json={
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(f"{FUSION_URL}/api/v1/fusion/analyze-project", json={
                     "user_id": user_id, "github_url": github_url
                 })
-            except: pass
+                logger.info(f"[SCM-AUDIT] Project analysis triggered for {user_id}: {github_url} (status={resp.status_code})")
+        except Exception as e:
+            logger.error(f"[SCM-AUDIT] Failed to analyze project for {user_id}: {e}")

@@ -10,6 +10,9 @@ from shared.models.user import UserRegistrationDTO, UserDocument, UserProfileRes
 from shared.database.mongo import get_collection
 from shared.auth.rbac import role_required
 from passlib.context import CryptContext
+import logging
+
+logger = logging.getLogger("auth-service.users")
 
 router = APIRouter(prefix="/api/v1/auth/users", tags=["users"])
 FUSION_URL = os.getenv("FUSION_URL", "http://fusion-service:8000")
@@ -45,28 +48,37 @@ async def login_user(dto: LoginDTO):
     # 1. Try Users (Developers)
     users_col = get_collection("users")
     user = await users_col.find_one({"username": dto.username})
+    source = "users"
     
     # 2. Try Managers
     if not user:
         managers_col = get_collection("managers")
         user = await managers_col.find_one({"username": dto.username})
-        if user: user["role"] = "manager" # Ensure role is set for isolated docs
+        if user:
+            user["role"] = "manager"
+            source = "managers"
 
     # 3. Try Tech Staff
     if not user:
         tech_col = get_collection("tech_staff")
         user = await tech_col.find_one({"username": dto.username})
-        if user: user["role"] = "tech"
+        if user:
+            user["role"] = "tech"
+            source = "tech_staff"
 
     if not user:
+        logger.warning(f"[AUTH] Login FAILED: username '{dto.username}' not found in any collection")
         raise HTTPException(status_code=401, detail="User not found")
         
     if not pwd_context.verify(dto.password, user["password_hash"]):
+        logger.warning(f"[AUTH] Login FAILED: invalid password for '{dto.username}' (source={source})")
         raise HTTPException(status_code=401, detail="Invalid password")
+    
+    logger.info(f"[AUTH] Login OK: '{dto.username}' authenticated from '{source}' collection (role={user.get('role')})")
     
     return {
         "status": "success",
-        "user_id": user.get("user_id", user.get("username")), # Fallback to username for isolated docs
+        "user_id": user.get("user_id", user.get("username")),
         "name": user["name"],
         "role": user.get("role", "developer"),
         "extension_id": user.get("extension_id", "N/A")

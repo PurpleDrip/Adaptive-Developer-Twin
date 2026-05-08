@@ -3,6 +3,9 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pydantic import BaseModel
 from app.services.neo4j import get_neo4j_session
+import logging
+
+logger = logging.getLogger("thg-service.router")
 
 router = APIRouter(prefix="/api/v1/thg", tags=["Temporal Heterogeneous Graph"])
 
@@ -134,8 +137,9 @@ async def update_skill_delta(data: dict, session=Depends(get_neo4j_session)):
     dev_id = data["dev_id"]
     skill_name = data["skill_name"]
     delta = data["delta"]
+    logger.info(f"[BGSC-FEEDBACK] Applying delta={delta:.3f} to {dev_id}/{skill_name}")
     
-    await session.run("""
+    result = await session.run("""
         MATCH (d:Developer {id: $dev_id})
         MERGE (s:Skill {name: $skill_name})
         MERGE (d)-[r:HAS_SKILL]->(s)
@@ -145,6 +149,12 @@ async def update_skill_delta(data: dict, session=Depends(get_neo4j_session)):
             r.updated = datetime()
         RETURN d.id AS dev_id, s.name AS skill_name, r.strength AS strength
     """, dev_id=dev_id, skill_name=skill_name, delta=delta)
+    
+    record = await result.single()
+    if record:
+        logger.info(f"[BGSC-FEEDBACK] Result: {record['dev_id']}/{record['skill_name']} -> strength={float(record['strength']):.3f}")
+    else:
+        logger.warning(f"[BGSC-FEEDBACK] Developer {dev_id} not found in graph — delta not applied")
     
     return {"status": "delta_applied"}
 
@@ -277,7 +287,7 @@ async def get_influence_ranking(session=Depends(get_neo4j_session)):
             return [{"rank": i+1, "dev_id": r["dev_id"], "name": r["name"], "influence_score": round(r["score"], 4)} 
                     for i, r in enumerate(records)]
     except Exception as e:
-        print(f"GDS Influence failed, falling back to Native Cypher: {e}")
+        logger.warning(f"[EVC-INFLUENCE] GDS PageRank unavailable, falling back to Native Cypher: {e}")
 
     # 2. Native Cypher Fallback (Relationship Density)
     # Measures influence by the diversity and strength of skills/tasks.

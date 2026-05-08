@@ -3,10 +3,16 @@ from fastapi.middleware.cors import CORSMiddleware
 import httpx
 import os
 import logging
+import sys
+import traceback
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger("gateway-service")
 
 app = FastAPI(title="ADT API Gateway", version="1.0.0")
 
@@ -38,7 +44,7 @@ SERVICE_URLS = {
 async def proxy(service: str, path: str, request: Request):
     base_url = SERVICE_URLS.get(service)
     if not base_url:
-        logger.warning(f"Unknown service requested: {service}")
+        logger.warning(f"[GATEWAY] Unknown service requested: '{service}' | path=/{path}")
         return Response(content='{"detail": "Service not found"}', status_code=404, media_type="application/json")
         
     url = f"{base_url}/api/v1/{service}/{path}"
@@ -57,27 +63,34 @@ async def proxy(service: str, path: str, request: Request):
                 headers=headers,
                 params=request.query_params
             )
+            
+            # Log non-200 responses for debugging
+            if resp.status_code >= 400:
+                logger.error(f"[GATEWAY] {method} {service}/{path} -> {resp.status_code} | body={resp.text[:200]}")
+            else:
+                logger.info(f"[GATEWAY] {method} {service}/{path} -> {resp.status_code}")
+            
             return Response(
                 content=resp.content, 
                 status_code=resp.status_code, 
                 media_type=resp.headers.get("content-type", "application/json")
             )
         except httpx.TimeoutException:
-            logger.error(f"Timeout proxying to {service}/{path}")
+            logger.error(f"[GATEWAY] TIMEOUT: {method} {service}/{path} (30s limit exceeded)")
             return Response(
                 content='{"detail": "Service timeout"}', 
                 status_code=504, 
                 media_type="application/json"
             )
         except httpx.RequestError as e:
-            logger.error(f"Network error proxying to {service}/{path}: {e}")
+            logger.error(f"[GATEWAY] NETWORK ERROR: {method} {service}/{path} -> {e}")
             return Response(
                 content='{"detail": "Service unavailable"}', 
                 status_code=502, 
                 media_type="application/json"
             )
         except Exception as e:
-            logger.exception(f"Unexpected error proxying to {service}/{path}")
+            logger.exception(f"[GATEWAY] UNEXPECTED ERROR: {method} {service}/{path}")
             return Response(
                 content='{"detail": "Internal server error"}', 
                 status_code=500, 
