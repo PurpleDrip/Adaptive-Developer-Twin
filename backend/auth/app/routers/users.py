@@ -121,7 +121,7 @@ async def register_user(dto: UserRegistrationDTO, background_tasks: BackgroundTa
     # Initialize in THG (Neo4j)
     try:
         async with httpx.AsyncClient() as client:
-            await client.post(f"{THG_URL}/api/v1/thg/thg/create-dev", json={
+            await client.post(f"{THG_URL}/api/v1/thg/create-dev", json={
                 "dev_id": user_id,
                 "name": dto.name,
                 "bio": "Expert in " + ", ".join(dto.strong_domains),

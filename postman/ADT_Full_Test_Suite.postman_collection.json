@@ -1,0 +1,544 @@
+{
+	"info": {
+		"name": "ADT Platform — Full Workflow Test Suite",
+		"description": "End-to-end test suite for the Adaptive Developer Twin platform.\n\nRun order: Health Checks → Auth → THG → Tasks → Assessment → Analytics\n\nBase URL: http://127.0.0.1:8000",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{ "key": "GATEWAY", "value": "http://127.0.0.1:8000" },
+		{ "key": "AUTH_DIRECT", "value": "http://127.0.0.1:8001" },
+		{ "key": "TASK_DIRECT", "value": "http://127.0.0.1:8003" },
+		{ "key": "ANALYTICS_DIRECT", "value": "http://127.0.0.1:8004" },
+		{ "key": "THG_DIRECT", "value": "http://127.0.0.1:8008" },
+		{ "key": "DEV_USERNAME", "value": "dev_1" },
+		{ "key": "DEV_PASSWORD", "value": "demo123" },
+		{ "key": "MGR_USERNAME", "value": "manager_1" },
+		{ "key": "TECH_USERNAME", "value": "admin_root" },
+		{ "key": "DEV_ID", "value": "dev_001" },
+		{ "key": "MGR_ID", "value": "mgr_001" },
+		{ "key": "TEST_ID", "value": "TEST-PY-001" }
+	],
+	"item": [
+		{
+			"name": "01 — Health Checks",
+			"description": "Verify all services are alive before running tests.",
+			"item": [
+				{
+					"name": "Gateway Health",
+					"request": {
+						"method": "GET",
+						"url": "{{GATEWAY}}/health"
+					}
+				},
+				{
+					"name": "Auth Service Health",
+					"request": {
+						"method": "GET",
+						"url": "{{AUTH_DIRECT}}/api/v1/auth/health"
+					}
+				},
+				{
+					"name": "Task Service Health",
+					"request": {
+						"method": "GET",
+						"url": "{{TASK_DIRECT}}/api/v1/task/health"
+					}
+				},
+				{
+					"name": "THG Service Health",
+					"request": {
+						"method": "GET",
+						"url": "{{THG_DIRECT}}/api/v1/thg/health"
+					}
+				},
+				{
+					"name": "Analytics Service Health",
+					"request": {
+						"method": "GET",
+						"url": "{{ANALYTICS_DIRECT}}/api/v1/analytics/health"
+					}
+				}
+			]
+		},
+		{
+			"name": "02 — Polymorphic Auth (Login)",
+			"description": "Tests the polymorphic login engine across all 3 isolated collections.",
+			"item": [
+				{
+					"name": "Login as Developer (users collection)",
+					"request": {
+						"method": "POST",
+						"url": "{{GATEWAY}}/api/v1/auth/users/login",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"{{DEV_USERNAME}}\",\n  \"password\": \"{{DEV_PASSWORD}}\"\n}"
+						}
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"var json = pm.response.json();",
+								"pm.test('Login returns 200', () => pm.response.to.have.status(200));",
+								"pm.test('Role is developer', () => pm.expect(json.role).to.equal('developer'));",
+								"pm.test('user_id returned', () => pm.expect(json.user_id).to.exist);",
+								"pm.collectionVariables.set('DEV_ID', json.user_id);"
+							]
+						}
+					}]
+				},
+				{
+					"name": "Login as Manager (managers collection)",
+					"request": {
+						"method": "POST",
+						"url": "{{GATEWAY}}/api/v1/auth/users/login",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"{{MGR_USERNAME}}\",\n  \"password\": \"{{DEV_PASSWORD}}\"\n}"
+						}
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"var json = pm.response.json();",
+								"pm.test('Login returns 200', () => pm.response.to.have.status(200));",
+								"pm.test('Role is manager', () => pm.expect(json.role).to.equal('manager'));",
+								"pm.collectionVariables.set('MGR_ID', json.user_id);"
+							]
+						}
+					}]
+				},
+				{
+					"name": "Login as Tech Admin (tech_staff collection)",
+					"request": {
+						"method": "POST",
+						"url": "{{GATEWAY}}/api/v1/auth/users/login",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"{{TECH_USERNAME}}\",\n  \"password\": \"{{DEV_PASSWORD}}\"\n}"
+						}
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"var json = pm.response.json();",
+								"pm.test('Login returns 200', () => pm.response.to.have.status(200));",
+								"pm.test('Role is tech', () => pm.expect(json.role).to.equal('tech'));"
+							]
+						}
+					}]
+				},
+				{
+					"name": "Login with WRONG password (should 401)",
+					"request": {
+						"method": "POST",
+						"url": "{{GATEWAY}}/api/v1/auth/users/login",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"dev_1\",\n  \"password\": \"wrongpassword\"\n}"
+						}
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"pm.test('Should return 401', () => pm.response.to.have.status(401));"
+							]
+						}
+					}]
+				},
+				{
+					"name": "Login with NON-EXISTENT user (should 401)",
+					"request": {
+						"method": "POST",
+						"url": "{{GATEWAY}}/api/v1/auth/users/login",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"ghost_user\",\n  \"password\": \"demo123\"\n}"
+						}
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"pm.test('Should return 401', () => pm.response.to.have.status(401));"
+							]
+						}
+					}]
+				}
+			]
+		},
+		{
+			"name": "03 — Developer Profile & Data",
+			"description": "Tests the developer data retrieval endpoints.",
+			"item": [
+				{
+					"name": "Get Developer Profile",
+					"request": {
+						"method": "GET",
+						"url": "{{GATEWAY}}/api/v1/auth/users/profile/{{DEV_ID}}"
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"var json = pm.response.json();",
+								"pm.test('Profile returns 200', () => pm.response.to.have.status(200));",
+								"pm.test('Has name', () => pm.expect(json.name).to.exist);",
+								"pm.test('Has extension_id', () => pm.expect(json.extension_id).to.exist);"
+							]
+						}
+					}]
+				},
+				{
+					"name": "Get Developer Tasks",
+					"request": {
+						"method": "GET",
+						"url": "{{GATEWAY}}/api/v1/task/user/{{DEV_ID}}"
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"pm.test('Tasks returns 200', () => pm.response.to.have.status(200));",
+								"pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+							]
+						}
+					}]
+				},
+				{
+					"name": "Validate Username Availability (should be taken)",
+					"request": {
+						"method": "GET",
+						"url": "{{GATEWAY}}/api/v1/auth/users/validate?field=username&value=dev_1"
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"pm.test('Returns 200', () => pm.response.to.have.status(200));",
+								"pm.test('Username is taken', () => pm.expect(pm.response.json().available).to.equal(false));"
+							]
+						}
+					}]
+				},
+				{
+					"name": "Validate Username Availability (should be free)",
+					"request": {
+						"method": "GET",
+						"url": "{{GATEWAY}}/api/v1/auth/users/validate?field=username&value=totally_new_user"
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"pm.test('Username is free', () => pm.expect(pm.response.json().available).to.equal(true));"
+							]
+						}
+					}]
+				}
+			]
+		},
+		{
+			"name": "04 — THG Graph Intelligence",
+			"description": "Tests the Neo4j-backed Topology Graph endpoints.",
+			"item": [
+				{
+					"name": "Get Developer Skills (HAS_SKILL)",
+					"request": {
+						"method": "GET",
+						"url": "{{GATEWAY}}/api/v1/thg/skills/{{DEV_ID}}"
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"pm.test('Skills returns 200 or 404 (no THG data)', () => {",
+								"  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+								"});"
+							]
+						}
+					}]
+				},
+				{
+					"name": "Get Influence Rankings (EVC-Influence)",
+					"request": {
+						"method": "GET",
+						"url": "{{GATEWAY}}/api/v1/thg/influence"
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"pm.test('Influence returns 200', () => pm.response.to.have.status(200));",
+								"pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+							]
+						}
+					}]
+				},
+				{
+					"name": "Get Skill Leaderboard (Python)",
+					"request": {
+						"method": "GET",
+						"url": "{{GATEWAY}}/api/v1/thg/leaderboard/Python"
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"pm.test('Leaderboard returns 200', () => pm.response.to.have.status(200));",
+								"pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+							]
+						}
+					}]
+				},
+				{
+					"name": "Get All Developers (Graph View)",
+					"request": {
+						"method": "GET",
+						"url": "{{GATEWAY}}/api/v1/thg/developers"
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"pm.test('Returns 200', () => pm.response.to.have.status(200));",
+								"pm.test('Has developer entries', () => pm.expect(pm.response.json().length).to.be.above(0));"
+							]
+						}
+					}]
+				},
+				{
+					"name": "Match Task to Developers (CSA-Matching)",
+					"request": {
+						"method": "POST",
+						"url": "{{GATEWAY}}/api/v1/thg/match",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"task_id\": \"TEST-MATCH-001\",\n  \"required_skills\": {\"Python\": 0.8, \"FastAPI\": 0.6}\n}"
+						}
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"pm.test('Match returns 200', () => pm.response.to.have.status(200));",
+								"pm.test('Has candidates', () => pm.expect(pm.response.json().candidates).to.be.an('array'));"
+							]
+						}
+					}]
+				}
+			]
+		},
+		{
+			"name": "05 — Assessment Engine (BGSC-Feedback)",
+			"description": "Tests the weekly challenge loop with anti-cheat protection.",
+			"item": [
+				{
+					"name": "Get Active Assessments",
+					"request": {
+						"method": "GET",
+						"url": "{{GATEWAY}}/api/v1/task/assessment/active"
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"pm.test('Returns 200', () => pm.response.to.have.status(200));",
+								"pm.test('Has active tests', () => pm.expect(pm.response.json().length).to.be.above(0));",
+								"var tests = pm.response.json();",
+								"if (tests.length > 0) pm.collectionVariables.set('TEST_ID', tests[0].test_id);"
+							]
+						}
+					}]
+				},
+				{
+					"name": "Submit Assessment (First Attempt — Should Pass)",
+					"request": {
+						"method": "POST",
+						"url": "{{GATEWAY}}/api/v1/task/assessment/submit",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"user_id\": \"{{DEV_ID}}\",\n  \"test_id\": \"{{TEST_ID}}\",\n  \"answers\": {\n    \"q1\": \"B\",\n    \"q2\": \"B\",\n    \"q3\": \"B\",\n    \"q4\": \"A\",\n    \"q5\": \"A\",\n    \"q6\": \"B\",\n    \"q7\": \"A\",\n    \"q8\": \"A\",\n    \"q9\": \"C\",\n    \"q10\": \"B\"\n  }\n}"
+						}
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"var json = pm.response.json();",
+								"pm.test('Submission returns 200', () => pm.response.to.have.status(200));",
+								"pm.test('Has score', () => pm.expect(json.score).to.be.a('number'));",
+								"pm.test('Has delta', () => pm.expect(json.delta).to.be.a('number'));"
+							]
+						}
+					}]
+				},
+				{
+					"name": "Submit Assessment AGAIN (Anti-Cheat — Should 403)",
+					"request": {
+						"method": "POST",
+						"url": "{{GATEWAY}}/api/v1/task/assessment/submit",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"user_id\": \"{{DEV_ID}}\",\n  \"test_id\": \"{{TEST_ID}}\",\n  \"answers\": {\n    \"q1\": \"A\",\n    \"q2\": \"A\",\n    \"q3\": \"A\",\n    \"q4\": \"A\",\n    \"q5\": \"A\",\n    \"q6\": \"A\",\n    \"q7\": \"A\",\n    \"q8\": \"A\",\n    \"q9\": \"A\",\n    \"q10\": \"A\"\n  }\n}"
+						}
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"pm.test('Anti-Cheat blocks re-submission', () => pm.response.to.have.status(403));"
+							]
+						}
+					}]
+				}
+			]
+		},
+		{
+			"name": "06 — Analytics & Leaderboard",
+			"description": "Tests the analytics summary and global leaderboard endpoints.",
+			"item": [
+				{
+					"name": "Get Developer Analytics Summary",
+					"request": {
+						"method": "GET",
+						"url": "{{GATEWAY}}/api/v1/analytics/stats/{{DEV_ID}}/summary"
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"var json = pm.response.json();",
+								"pm.test('Summary returns 200', () => pm.response.to.have.status(200));",
+								"pm.test('Has rank', () => pm.expect(json.overall_rank).to.exist);",
+								"pm.test('Has velocity', () => pm.expect(json.learning_velocity).to.exist);"
+							]
+						}
+					}]
+				},
+				{
+					"name": "Get Global Leaderboard (Composite Score)",
+					"request": {
+						"method": "GET",
+						"url": "{{GATEWAY}}/api/v1/analytics/leaderboard?skill=Python"
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"pm.test('Leaderboard returns 200', () => pm.response.to.have.status(200));",
+								"pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+							]
+						}
+					}]
+				}
+			]
+		},
+		{
+			"name": "07 — Task Allocation (Manager Flow)",
+			"description": "Tests the complete task creation, matching, and assignment flow.",
+			"item": [
+				{
+					"name": "Get All Tasks",
+					"request": {
+						"method": "GET",
+						"url": "{{GATEWAY}}/api/v1/task/all"
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"pm.test('Returns 200', () => pm.response.to.have.status(200));",
+								"pm.test('Has tasks', () => pm.expect(pm.response.json().length).to.be.above(0));"
+							]
+						}
+					}]
+				},
+				{
+					"name": "Create New Task (CSA-Matching Trigger)",
+					"request": {
+						"method": "POST",
+						"url": "{{GATEWAY}}/api/v1/task/create",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Migrate Authentication to OAuth2\",\n  \"description\": \"Implement OAuth2 with PKCE flow for all client applications.\",\n  \"required_skills\": {\"Python\": 0.8, \"FastAPI\": 0.7}\n}"
+						}
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"var json = pm.response.json();",
+								"pm.test('Task created (201)', () => pm.response.to.have.status(201));",
+								"pm.test('Has task_id', () => pm.expect(json.task_id).to.exist);",
+								"pm.collectionVariables.set('NEW_TASK_ID', json.task_id);"
+							]
+						}
+					}]
+				}
+			]
+		},
+		{
+			"name": "08 — Security Perimeter",
+			"description": "Verifies that the Zero-Trust security measures are enforced.",
+			"item": [
+				{
+					"name": "Hardware Lock — Validate Extension (First Handshake)",
+					"request": {
+						"method": "POST",
+						"url": "{{GATEWAY}}/api/v1/auth/users/validate-extension",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"extension_id\": \"ADT-DX-101\",\n  \"machine_id\": \"HWID-TEST-MACHINE-001\"\n}"
+						}
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"pm.test('Returns 200', () => pm.response.to.have.status(200));",
+								"var json = pm.response.json();",
+								"pm.test('Status is LOCKED or VERIFIED', () => {",
+								"  pm.expect(json.status).to.be.oneOf(['LOCKED_TO_HARDWARE', 'VERIFIED']);",
+								"});"
+							]
+						}
+					}]
+				},
+				{
+					"name": "Hardware Lock — WRONG Machine (Should 403)",
+					"request": {
+						"method": "POST",
+						"url": "{{GATEWAY}}/api/v1/auth/users/validate-extension",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"extension_id\": \"ADT-DX-101\",\n  \"machine_id\": \"HWID-ATTACKER-MACHINE-999\"\n}"
+						}
+					},
+					"event": [{
+						"listen": "test",
+						"script": {
+							"exec": [
+								"pm.test('Hardware mismatch should 403', () => pm.response.to.have.status(403));"
+							]
+						}
+					}]
+				}
+			]
+		}
+	]
+}
