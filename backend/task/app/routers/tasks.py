@@ -51,11 +51,11 @@ async def assign_task(task_id: str, dto: TaskAssignDTO):
 @router.get("/user/{user_id}")
 async def get_user_tasks(user_id: str):
     tasks_col = get_collection("tasks")
-    cursor = tasks_col.find({"assigned_to": user_id})
+    cursor = tasks_col.find({"assigned_to": user_id}, {"_id": 0})
     return await cursor.to_list(length=10)
 
 @router.get("/all")
 async def get_all_tasks():
     tasks_col = get_collection("tasks")
-    cursor = tasks_col.find({})
+    cursor = tasks_col.find({}, {"_id": 0})
     return await cursor.to_list(length=100)

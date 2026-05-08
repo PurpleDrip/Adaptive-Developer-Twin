@@ -224,10 +224,15 @@ async def hardware_lock(extension_id: str, machine_id: str):
     return {"status": "verified"}
 
 @router.post("/validate-extension")
-async def validate_extension(extension_id: str, machine_id: str):
+async def validate_extension(data: dict):
     """
     Validates identity and enforces Immutable Hardware Anchor.
     """
+    extension_id = data.get("extension_id")
+    machine_id = data.get("machine_id")
+    if not extension_id or not machine_id:
+        raise HTTPException(status_code=400, detail="extension_id and machine_id required")
+
     users_col = get_collection("users")
     
     # 1. Find the user by Extension ID
@@ -240,7 +245,6 @@ async def validate_extension(extension_id: str, machine_id: str):
     
     if not existing_lock:
         # FIRST TIME HANDSHAKE: Anchor this machine to this identity
-        # BUT: Ensure this machine isn't already anchored to someone else
         duplicate_machine = await users_col.find_one({"machine_id": machine_id})
         if duplicate_machine:
             raise HTTPException(status_code=403, detail="Machine already anchored to another identity")
@@ -249,10 +253,12 @@ async def validate_extension(extension_id: str, machine_id: str):
             {"extension_id": extension_id},
             {"$set": {"machine_id": machine_id, "locked_at": datetime.utcnow()}}
         )
+        logger.info(f"[SHA-HWID] Hardware lock established: {extension_id} -> {machine_id}")
         return {"user_id": user["user_id"], "name": user["name"], "status": "LOCKED_TO_HARDWARE"}
 
     # 3. Verify existing lock
     if existing_lock != machine_id:
+        logger.warning(f"[SHA-HWID] Hardware MISMATCH: {extension_id} expected {existing_lock}, got {machine_id}")
         raise HTTPException(status_code=403, detail="Hardware mismatch: Identity is anchored to another machine")
 
     return {"user_id": user["user_id"], "name": user["name"], "status": "VERIFIED"}

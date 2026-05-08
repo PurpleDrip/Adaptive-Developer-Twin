@@ -89,7 +89,7 @@ async def submit_assessment(submission: TestSubmission):
 async def get_active_assessments():
     """List assessments for the developer to take."""
     db_assessments = get_collection("assessments")
-    cursor = db_assessments.find({"is_active": True}).sort("created_at", -1).limit(5)
+    cursor = db_assessments.find({"is_active": True}, {"_id": 0}).sort("created_at", -1).limit(5)
     results = await cursor.to_list(length=5)
     logger.info(f"[ASSESSMENT] Returned {len(results)} active assessments")
     return results
