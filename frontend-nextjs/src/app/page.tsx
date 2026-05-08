@@ -11,12 +11,15 @@ export default function LandingPage() {
 
   const roles = [
     { id: 'developer', title: 'Developer', icon: <User size={40} />, desc: 'Register your twin and start the ladder climb.' },
-    { id: 'project_manager', title: 'Project Manager', icon: <Briefcase size={40} />, desc: 'Orchestrate teams, track delivery, and optimize allocation.' }
+    { id: 'project_manager', title: 'Project Manager', icon: <Briefcase size={40} />, desc: 'Orchestrate teams, track delivery, and optimize allocation.' },
+    { id: 'tech', title: 'Tech Admin', icon: <ShieldCheck size={40} />, desc: 'System monitoring, audit logs, and infrastructure control.' }
   ];
 
   const handleProceed = () => {
     if (selectedRole === 'developer') {
       router.push('/onboarding/developer');
+    } else if (selectedRole === 'tech') {
+      router.push('/tech');
     } else {
       router.push(`/login?role=${selectedRole}`);
     }
@@ -28,7 +31,7 @@ export default function LandingPage() {
         <h1 className="text-6xl font-extrabold text-blue-500 mb-2">Adaptive Developer Twin</h1>
         <p className="text-gray-400 text-xl mb-12">Select your role to enter the ecosystem</p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           {roles.map((role) => (
             <RoleCard
               key={role.id}

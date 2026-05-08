@@ -39,23 +39,37 @@ async def get_analysis_progress(user_id: str):
 
 @router.post("/login")
 async def login_user(dto: LoginDTO):
-    """Verifies credentials and returns user profile."""
+    """
+    Polymorphic Login: Checks across isolated collections (users, managers, tech_staff).
+    """
+    # 1. Try Users (Developers)
     users_col = get_collection("users")
     user = await users_col.find_one({"username": dto.username})
     
+    # 2. Try Managers
     if not user:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
-    
-    # Verify password
+        managers_col = get_collection("managers")
+        user = await managers_col.find_one({"username": dto.username})
+        if user: user["role"] = "manager" # Ensure role is set for isolated docs
+
+    # 3. Try Tech Staff
+    if not user:
+        tech_col = get_collection("tech_staff")
+        user = await tech_col.find_one({"username": dto.username})
+        if user: user["role"] = "tech"
+
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+        
     if not pwd_context.verify(dto.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+        raise HTTPException(status_code=401, detail="Invalid password")
     
     return {
         "status": "success",
-        "user_id": user["user_id"],
+        "user_id": user.get("user_id", user.get("username")), # Fallback to username for isolated docs
         "name": user["name"],
-        "role": user["role"],
-        "extension_id": user["extension_id"]
+        "role": user.get("role", "developer"),
+        "extension_id": user.get("extension_id", "N/A")
     }
 
 @router.post("/register", status_code=201)
@@ -162,6 +176,16 @@ async def get_all_users(role: str = Depends(role_required(["manager", "PM", "tec
     """
     users_col = get_collection("users")
     cursor = users_col.find({}, {"password_hash": 0})
+    return await cursor.to_list(length=100)
+
+@router.get("/squad/{manager_id}")
+async def get_manager_squad(manager_id: str, role: str = Depends(role_required(["manager", "PM", "tech"]))):
+    """
+    Returns only the developers assigned to a specific manager.
+    Used for isolated squad oversight.
+    """
+    users_col = get_collection("users")
+    cursor = users_col.find({"manager_id": manager_id, "role": "developer"}, {"password_hash": 0})
     return await cursor.to_list(length=100)
 
 @router.get("/profile/{user_id}", response_model=UserProfileResponse)

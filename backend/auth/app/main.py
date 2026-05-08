@@ -1,7 +1,19 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import users, admin, connect, notifications
 from shared.database.mongo import connect_mongo, close_mongo
+import logging
+import traceback
+import sys
+
+# Configure Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger("auth-service")
 
 app = FastAPI(title="ADT Authentication Service", version="1.0.0")
 
@@ -12,8 +24,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Global Exception Handler for 500 Errors
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    error_details = traceback.format_exc()
+    logger.error(f"500 Internal Server Error on {request.url.path}\n{error_details}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error", "traceback": error_details.split("\n")[-2]}
+    )
+
 @app.on_event("startup")
 async def startup_db_client():
+    logger.info("Connecting to MongoDB...")
     await connect_mongo()
 
 @app.on_event("shutdown")

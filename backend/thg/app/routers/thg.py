@@ -125,12 +125,28 @@ async def update_skill(
     if not record:
         raise HTTPException(404, "Developer not found in graph. Primary sync failed.")
 
-    return {
-        "status": "updated",
-        "dev_id": record["dev_id"],
-        "skill": record["skill_name"],
-        "strength": float(record["strength"])
-    }
+@router.post("/update-skill")
+async def update_skill_delta(data: dict, session=Depends(get_neo4j_session)):
+    """
+    Applies an incremental delta to a developer's skill strength.
+    Used by the Assessment Service to evolve the Neural Twin based on tests.
+    """
+    dev_id = data["dev_id"]
+    skill_name = data["skill_name"]
+    delta = data["delta"]
+    
+    await session.run("""
+        MATCH (d:Developer {id: $dev_id})
+        MERGE (s:Skill {name: $skill_name})
+        MERGE (d)-[r:HAS_SKILL]->(s)
+        SET r.strength = CASE WHEN (coalesce(r.strength, 0.5) + $delta) > 1.0 THEN 1.0 
+                             WHEN (coalesce(r.strength, 0.5) + $delta) < 0.0 THEN 0.0
+                             ELSE (coalesce(r.strength, 0.5) + $delta) END,
+            r.updated = datetime()
+        RETURN d.id AS dev_id, s.name AS skill_name, r.strength AS strength
+    """, dev_id=dev_id, skill_name=skill_name, delta=delta)
+    
+    return {"status": "delta_applied"}
 
 # 2. Get Developer Skills (Live Profile)
 @router.get("/skills/{dev_id}", response_model=DeveloperSkills)
@@ -230,33 +246,49 @@ async def generate_demo_graph(session=Depends(get_neo4j_session)):
     """)
     return {"status": "reset_complete"}
 
-# 5. Graph Analytics - PageRank Influence
 @router.get("/influence")
 async def get_influence_ranking(session=Depends(get_neo4j_session)):
     """
-    Uses Neo4j Graph Data Science (GDS) to compute developer influence.
-    Measures how central a developer is to the skills/tasks graph.
+    Computes developer influence. 
+    Attempts to use Neo4j GDS (PageRank) but falls back to native degree centrality 
+    if GDS is not available (common in AuraDB Cloud).
     """
     try:
-        # Create a projection if not exists (simplified for the endpoint)
+        # 1. Attempt GDS PageRank
+        # Ensure projection exists
+        await session.run("CALL gds.graph.drop('influence_graph', false) YIELD graphName") # Cleanup
         await session.run("""
-            CALL gds.graph.project.cypher(
+            CALL gds.graph.project(
                 'influence_graph',
-                'MATCH (n) WHERE n:Developer OR n:Skill RETURN id(n) AS id',
-                'MATCH (d:Developer)-[r:HAS_SKILL]->(s:Skill) RETURN id(d) AS source, id(s) AS target'
-            ) YIELD graphName
+                'Developer',
+                'HAS_SKILL'
+            )
         """)
-    except:
-        pass # Already exists or GDS not ready
+        
+        result = await session.run("""
+            CALL gds.pageRank.stream('influence_graph')
+            YIELD nodeId, score
+            MATCH (d:Developer) WHERE id(d) = nodeId
+            RETURN d.id AS dev_id, d.name AS name, score
+            ORDER BY score DESC LIMIT 20
+        """)
+        records = await result.data()
+        if records:
+            return [{"rank": i+1, "dev_id": r["dev_id"], "name": r["name"], "influence_score": round(r["score"], 4)} 
+                    for i, r in enumerate(records)]
+    except Exception as e:
+        print(f"GDS Influence failed, falling back to Native Cypher: {e}")
 
+    # 2. Native Cypher Fallback (Relationship Density)
+    # Measures influence by the diversity and strength of skills/tasks.
     result = await session.run("""
-        CALL gds.pageRank.stream('influence_graph')
-        YIELD nodeId, score
-        MATCH (d:Developer) WHERE id(d) = nodeId
-        RETURN d.id AS dev_id, d.name AS name, score
-        ORDER BY score DESC LIMIT 10
+        MATCH (d:Developer)
+        OPTIONAL MATCH (d)-[r:HAS_SKILL]->(s:Skill)
+        WITH d, count(s) AS skill_count, sum(r.strength) AS total_strength
+        RETURN d.id AS dev_id, d.name AS name, 
+               (skill_count * 0.5 + total_strength * 0.5) AS influence_score
+        ORDER BY influence_score DESC LIMIT 20
     """)
-    
     records = await result.data()
-    return [{"rank": i+1, "dev_id": r["dev_id"], "name": r["name"], "influence_score": round(r["score"], 4)} 
+    return [{"rank": i+1, "dev_id": r["dev_id"], "name": r["name"], "influence_score": round(r["influence_score"], 4)} 
             for i, r in enumerate(records)]

@@ -3,24 +3,33 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Terminal, Shield, Lock, ArrowRight, Command } from 'lucide-react';
+import { authApi } from '@/lib/api/auth';
 
 export default function TechPortalLogin() {
     const router = useRouter();
     const [credentials, setCredentials] = useState({ username: '', password: '' });
     const [status, setStatus] = useState<'idle' | 'authenticating' | 'error'>('idle');
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setStatus('authenticating');
 
-        // Mock Auth for UI Perfection
-        setTimeout(() => {
-            if (credentials.username === 'admin' && credentials.password === 'admin') {
+        try {
+            const data = await authApi.login(credentials);
+            
+            // Store in local storage and cookies for session persistence and middleware
+            localStorage.setItem('adt_user', JSON.stringify(data));
+            document.cookie = `adt_user=${encodeURIComponent(JSON.stringify(data))}; path=/; max-age=86400; SameSite=Lax`;
+
+            if (data.role === 'tech') {
                 router.push('/tech/dashboard');
             } else {
                 setStatus('error');
             }
-        }, 1500);
+        } catch (err) {
+            console.error("Auth failed:", err);
+            setStatus('error');
+        }
     };
 
     return (

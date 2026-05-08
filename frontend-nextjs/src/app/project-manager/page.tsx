@@ -37,9 +37,9 @@ export default function ProjectManagerDashboard() {
                     return;
                 }
 
-                // 1. Fetch Squad Data (Allotted Devs)
-                const resp = await authApi.getAllUsers();
-                const devList = resp.data.filter((u: any) => u.role === 'developer');
+                // 1. Fetch Squad Data (Isolated for this manager)
+                const resp = await authApi.getSquad(session.user_id);
+                const devList = resp.data;
                 
                 const devsWithPerformance = await Promise.all(devList.map(async (dev: any) => {
                     try {

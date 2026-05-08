@@ -72,9 +72,9 @@ class UserProfileResponse(BaseModel):
     name: str
     email: str
     role: str
-    experience_level: str
-    strong_domains: List[str]
-    registered_at: datetime
+    experience_level: Optional[str] = "Junior"
+    strong_domains: List[str] = Field(default_factory=list)
+    registered_at: datetime = Field(default_factory=datetime.utcnow)
     project_analysis_status: Optional[str] = "pending"
 
 class AdminCreateAccountDTO(BaseModel):
