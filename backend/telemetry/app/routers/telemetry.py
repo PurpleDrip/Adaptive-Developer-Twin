@@ -10,77 +10,54 @@ router = APIRouter(prefix="/telemetry", tags=["telemetry"])
 AUTH_URL = os.getenv("AUTH_URL", "http://auth-service:8000")
 
 @router.post("/handshake")
-async def telemetry_handshake(user_id: str, current_hash: str):
+async def telemetry_handshake(extension_id: str, current_hash: str, machine_id: str):
     """
-    SHEC Protocol Handshake. 
-    Verifies if developer worked overnight/offline.
+    SHEC Protocol Handshake via ExtensionID.
     """
+    # 1. Resolve Identity
+    async with httpx.AsyncClient() as client:
+        auth_resp = await client.post(f"{AUTH_URL}/api/v1/auth/users/validate-extension", params={"extension_id": extension_id, "machine_id": machine_id})
+        if auth_resp.status_code != 200:
+            raise HTTPException(status_code=401, detail="Invalid ExtensionID")
+        user_id = auth_resp.json()["user_id"]
+
     users_col = get_collection("users")
     user = await users_col.find_one({"user_id": user_id})
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    if not user: raise HTTPException(status_code=404, detail="User profile not synced")
         
     last_hash = user.get("last_known_state_hash")
-    
     if last_hash == current_hash:
-        return {
-            "status": "synchronized",
-            "message": "Workspace state matches. Continue with delta sync."
-        }
+        return {"status": "synchronized"}
     else:
-        return {
-            "status": "mismatch",
-            "message": "State mismatch detected. Please backfill missed diffs.",
-            "last_known_hash": last_hash,
-            "last_sync_at": user.get("last_sync_at")
-        }
+        return {"status": "mismatch", "last_known_hash": last_hash}
 
 @router.post("/ingest", status_code=201)
 async def ingest_telemetry(data: TelemetryIngestDTO, request: Request):
     """
-    Continuous Monitoring Ingest.
-    Receives diff-based telemetry heartbeats from office-issued laptops.
+    Continuous Monitoring Ingest via ExtensionID.
     """
-    # Validate Extension ID with Auth Service
+    # 1. Resolve Identity & Validate Lock
     async with httpx.AsyncClient() as client:
-        try:
-            auth_resp = await client.post(
-                f"{AUTH_URL}/api/v1/auth/users/validate-extension", 
-                params={"extension_id": data.extension_id, "machine_id": data.machine_id}
-            )
-            if auth_resp.status_code != 200:
-                raise HTTPException(status_code=401, detail="Invalid or inactive extension_id")
-            
-            auth_data = auth_resp.json()
-            if auth_data["user_id"] != data.user_id:
-                raise HTTPException(status_code=403, detail="Extension ID does not match User ID")
-        except httpx.RequestError:
-            raise HTTPException(status_code=503, detail="Auth Service unavailable")
+        auth_resp = await client.post(f"{AUTH_URL}/api/v1/auth/users/validate-extension", params={"extension_id": data.extension_id, "machine_id": data.machine_id})
+        if auth_resp.status_code != 200:
+            raise HTTPException(status_code=401, detail="Extension ID mismatch or hardware lock violation")
+        resolved_user_id = auth_resp.json()["user_id"]
 
-    # Store Raw Telemetry (Always accepted in 'Continuous Mode')
+    # Store Raw Telemetry
     db_raw = get_collection("telemetry_raw")
     doc = TelemetryRawDocument.create(data)
+    doc["user_id"] = resolved_user_id # Inject resolved identity
     await db_raw.insert_one(doc)
 
-    # Update SHEC state on the user document
+    # Update SHEC state
     users_col = get_collection("users")
-    if data.sync_type == SyncType.DELTA and data.diff_payload:
-        # In a real system, we'd compute the new hash here or receive it from the extension
-        # For now, we update the last_sync_at
-        await users_col.update_one(
-            {"user_id": data.user_id},
-            {"$set": {"last_sync_at": datetime.utcnow()}}
-        )
+    await users_col.update_one({"user_id": resolved_user_id}, {"$set": {"last_sync_at": datetime.utcnow()}})
 
-    return {
-        "status": "ingested",
-        "sync_mode": "continuous_shec",
-        "timestamp": datetime.utcnow().isoformat()
-    }
+    return {"status": "ingested", "timestamp": datetime.utcnow().isoformat()}
 
-@router.get("/status/{user_id}")
-async def get_ingestion_status(user_id: str):
+@router.get("/status/{extension_id}")
+async def get_ingestion_status(extension_id: str):
+    # This would also resolve user_id first in a full prod system
     db_raw = get_collection("telemetry_raw")
-    count = await db_raw.count_documents({"user_id": user_id, "processed": False})
+    count = await db_raw.count_documents({"extension_id": extension_id, "processed": False})
     return {"pending_records": count}

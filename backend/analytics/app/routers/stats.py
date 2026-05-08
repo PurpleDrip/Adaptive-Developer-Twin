@@ -6,7 +6,7 @@ from shared.database.mongo import get_collection
 from app.services.burnout_predictor import BurnoutPredictor
 from app.services.success_predictor import SuccessPredictor
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1/analytics/stats")
 TELEMETRY_URL = os.getenv("TELEMETRY_URL", "http://telemetry-service:8000")
 
 burnout_model = BurnoutPredictor()
@@ -85,16 +85,50 @@ async def get_task_success_probability(user_id: str, task_id: str):
         "prediction": prediction
     }
 
+from app.api.clients import THGClient
+
 @router.get("/{user_id}/summary")
 async def get_developer_analytics_summary(user_id: str):
     """
-    Aggregated view for the Developer Dashboard.
+    Aggregated view for the Developer Dashboard — Real Data Synthesis.
     """
-    # This would combine burnout, success trends, and feedback
+    # 1. Fetch Real Skills from THG
+    skill_data = await THGClient.get_dev_skills(user_id)
+    skills_list = [s["name"] for s in skill_data.get("skills", [])]
+
+    # 2. Fetch Real Global Rank (Influence)
+    rank = 0
+    percentile = 0
+    inf_data = await THGClient.get_influence()
+    if isinstance(inf_data, list):
+        for i, r in enumerate(inf_data):
+            if r["dev_id"] == user_id:
+                rank = r.get("rank", i+1)
+                percentile = round((1 - (i / len(inf_data))) * 100, 1)
+                break
+
+    # 3. Fetch Real Telemetry Aggregates
+    db_batches = get_collection("telemetry_batches")
+    pipeline = [
+        {"$match": {"user_id": user_id}},
+        {"$group": {
+            "_id": None,
+            "avg_wpm": {"$avg": "$aggregated_signals.avg_wpm"},
+            "total_hours": {"$sum": 0.5}, # Each batch is 30m
+            "total_lines": {"$sum": "$aggregated_signals.total_keystrokes"}
+        }}
+    ]
+    stats = await db_batches.aggregate(pipeline).to_list(1)
+    summary = stats[0] if stats else {"avg_wpm": 0, "total_hours": 0, "total_lines": 0}
+
     return {
         "user_id": user_id,
-        "overall_rank_percentile": 85,
-        "learning_velocity": "high",
-        "primary_domain": "Backend",
-        "top_skills": ["FastAPI", "Neo4j", "Python"]
+        "overall_rank": rank or "UNRANKED",
+        "overall_rank_percentile": percentile or 0,
+        "learning_velocity": "STABLE" if summary["avg_wpm"] > 40 else "RISING",
+        "primary_domain": "Engineering",
+        "top_skills": skills_list[:5],
+        "active_hours": round(summary.get("total_hours", 0), 1),
+        "wpm": round(summary.get("avg_wpm", 0), 1),
+        "lines": int(summary.get("total_lines", 0) / 5) # Rough line estimate
     }

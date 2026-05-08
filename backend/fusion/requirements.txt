@@ -6,3 +6,5 @@ neo4j
 scikit-learn
 transformers
 torch
+dnspython
+redis

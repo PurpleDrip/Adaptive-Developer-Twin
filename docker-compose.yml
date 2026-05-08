@@ -1,50 +1,6 @@
 version: "3.8"
 
 services:
-  neo4j:
-    image: neo4j:5.12
-    ports:
-      - "7474:7474"
-      - "7687:7687"
-    environment:
-      NEO4J_AUTH: ${NEO4J_AUTH}
-      NEO4J_PLUGINS: '["graph-data-science"]'
-    volumes:
-      - neo4j_data:/data
-      - neo4j_logs:/logs
-    restart: unless-stopped
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "cypher-shell",
-          "-u",
-          "$${NEO4J_USER}",
-          "-p",
-          "$${NEO4J_PASSWORD}",
-          "MATCH () RETURN count(*) limit 1",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
-  mongodb:
-    image: mongo:7.0
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
-    volumes:
-      - mongo_data:/data/db
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
-
   telemetry-service:
     build:
       context: .
@@ -56,8 +12,8 @@ services:
       THG_URL: ${THG_URL}
       AUTH_URL: ${AUTH_URL}
       MONGO_URI: ${MONGO_URI}
-    depends_on:
-      - mongodb
+      REDIS_URL: ${REDIS_URL}
+    restart: always
 
   fusion-service:
     build:
@@ -70,8 +26,8 @@ services:
       NEO4J_USER: ${NEO4J_USER}
       NEO4J_PASSWORD: ${NEO4J_PASSWORD}
       MONGO_URI: ${MONGO_URI}
-    depends_on:
-      - mongodb
+      REDIS_URL: ${REDIS_URL}
+    restart: always
 
   thg-service:
     build:
@@ -84,9 +40,7 @@ services:
       NEO4J_USER: ${NEO4J_USER}
       NEO4J_PASSWORD: ${NEO4J_PASSWORD}
       MONGO_URI: ${MONGO_URI}
-    depends_on:
-      - neo4j
-      - mongodb
+    restart: always
 
   allocation-engine:
     build:
@@ -101,9 +55,7 @@ services:
       THG_URL: ${THG_URL}
       FUSION_URL: ${FUSION_URL}
       MONGO_URI: ${MONGO_URI}
-    depends_on:
-      - neo4j
-      - mongodb
+    restart: always
 
   analytics-service:
     build:
@@ -115,8 +67,8 @@ services:
       MONGO_URI: ${MONGO_URI}
       THG_URL: ${THG_URL}
       FUSION_URL: ${FUSION_URL}
-    depends_on:
-      - mongodb
+      REDIS_URL: ${REDIS_URL}
+    restart: always
 
   monitoring-service:
     build:
@@ -126,10 +78,8 @@ services:
       - "8007:8000"
     environment:
       MONGO_URI: ${MONGO_URI}
-      REDIS_URL: redis://redis:6379
-    depends_on:
-      - mongodb
-      - redis
+      REDIS_URL: ${REDIS_URL}
+    restart: always
 
   task-service:
     build:
@@ -142,8 +92,8 @@ services:
       THG_URL: ${THG_URL}
       ALLOCATION_URL: ${ALLOCATION_URL}
       FUSION_URL: ${FUSION_URL}
-    depends_on:
-      - mongodb
+      REDIS_URL: ${REDIS_URL}
+    restart: always
 
   gateway-service:
     build:
@@ -161,13 +111,7 @@ services:
       ANALYTICS_URL: ${ANALYTICS_URL}
       MONITORING_URL: ${MONITORING_URL}
       TASK_URL: ${TASK_URL}
-
-
-  redis:
-    image: redis:7.0-alpine
-    ports:
-      - "6379:6379"
-    restart: unless-stopped
+    restart: always
 
   auth-service:
     build:
@@ -179,12 +123,5 @@ services:
       THG_URL: ${THG_URL}
       FUSION_URL: ${FUSION_URL}
       MONGO_URI: ${MONGO_URI}
-      REDIS_URL: redis://redis:6379
-    depends_on:
-      - mongodb
-      - redis
-
-volumes:
-  neo4j_data:
-  neo4j_logs:
-  mongo_data:
+      REDIS_URL: ${REDIS_URL}
+    restart: always

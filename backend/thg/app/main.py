@@ -17,7 +17,7 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
-app.include_router(thg.router, prefix="/api/v1/thg", tags=["thg"])
+app.include_router(thg.router, tags=["thg"])
 
 @app.on_event("startup")
 async def startup():

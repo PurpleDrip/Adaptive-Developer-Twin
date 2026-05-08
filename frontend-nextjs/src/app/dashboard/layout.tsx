@@ -8,6 +8,16 @@ import { LayoutDashboard, Users, ClipboardList, Activity } from 'lucide-react';
 const Sidebar = () => {
   const pathname = usePathname();
   const isActive = (path: string) => pathname.startsWith(path);
+  const [user, setUser] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    const session = JSON.parse(localStorage.getItem('adt_user') || '{}');
+    setUser(session);
+  }, []);
+
+  const getInitials = (name: string) => {
+    return name ? name.split(' ').map(n => n[0]).join('') : '??';
+  };
 
   return (
     <div className="w-72 border-r border-zinc-800 flex flex-col h-screen sticky top-0 bg-black">
@@ -26,31 +36,28 @@ const Sidebar = () => {
           <LayoutDashboard size={20} /> <span className="font-semibold">My Twin</span>
         </Link>
         
-        <Link 
-          href="/hrm" 
-          className={`flex items-center gap-3 p-4 rounded-xl transition-all ${
-            isActive('/hrm') ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' : 'text-gray-500 hover:text-white'
-          }`}
-        >
-          <Users size={20} /> <span className="font-semibold">HRM Panel</span>
-        </Link>
-        
-        <Link 
-          href="/senior" 
-          className={`flex items-center gap-3 p-4 rounded-xl transition-all ${
-            isActive('/senior') ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' : 'text-gray-500 hover:text-white'
-          }`}
-        >
-          <ClipboardList size={20} /> <span className="font-semibold">Orchestration</span>
-        </Link>
+        {(user?.role === 'manager' || user?.role === 'PM') && (
+          <>
+            <Link 
+              href="/project-manager" 
+              className={`flex items-center gap-3 p-4 rounded-xl transition-all ${
+                isActive('/project-manager') ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' : 'text-gray-500 hover:text-white'
+              }`}
+            >
+              <Users size={20} /> <span className="font-semibold">Squad Hub</span>
+            </Link>
+          </>
+        )}
       </nav>
 
       <div className="p-6 border-t border-zinc-800">
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center font-bold">SV</div>
+          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center font-bold text-xs">
+            {getInitials(user?.name || 'Dev')}
+          </div>
           <div>
-            <p className="text-sm font-bold">Shashanth Vemuri</p>
-            <p className="text-[10px] text-gray-500 uppercase tracking-widest">Senior Architect</p>
+            <p className="text-sm font-bold truncate max-w-[150px]">{user?.name || "Developer"}</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-widest">{user?.role || "Team Member"}</p>
           </div>
         </div>
       </div>

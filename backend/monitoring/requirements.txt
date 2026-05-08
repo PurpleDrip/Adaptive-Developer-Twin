@@ -3,5 +3,7 @@ uvicorn
 pydantic
 httpx
 motor
+dnspython
 redis
 websockets
+dnspython

@@ -4,3 +4,4 @@ pydantic
 pydantic-settings
 neo4j
 httpx
+dnspython

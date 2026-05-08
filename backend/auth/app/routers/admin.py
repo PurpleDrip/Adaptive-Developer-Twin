@@ -9,7 +9,10 @@ from shared.models.user import AdminCreateAccountDTO, UserDocument
 from shared.database.mongo import get_collection
 from passlib.context import CryptContext
 
-router = APIRouter()
+from shared.auth.rbac import role_required
+from passlib.context import CryptContext
+
+router = APIRouter(dependencies=[Depends(role_required(["tech"]))])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 @router.post("/create-manager", status_code=201)
@@ -110,22 +113,28 @@ async def get_collection_data(collection: str, limit: int = 100, skip: int = 0, 
 
 @router.patch("/explorer/{collection}/{doc_id}")
 async def update_document_field(collection: str, doc_id: str, updates: Dict[str, Any]):
-    """Update specific fields in a document (Neon-style inline edit)."""
+    """Update specific fields in a document (Universal Resolver)."""
     col = get_collection(collection)
+    
+    # Try multiple identifier strategies
+    query_strategies = []
     try:
-        result = await col.update_one(
-            {"_id": ObjectId(doc_id)},
-            {"$set": updates}
-        )
-        if result.matched_count == 0:
-             # Fallback if _id is string (e.g. system_config)
-             result = await col.update_one({"user_id": doc_id}, {"$set": updates})
-             if result.matched_count == 0:
-                 result = await col.update_one({"key": doc_id}, {"$set": updates})
+        query_strategies.append({"_id": ObjectId(doc_id)})
+    except: pass
+    query_strategies.extend([{"_id": doc_id}, {"user_id": doc_id}, {"key": doc_id}, {"task_id": doc_id}])
 
-        return {"status": "success", "modified_count": result.modified_count}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    for query in query_strategies:
+        result = await col.update_one(query, {"$set": updates})
+        if result.matched_count > 0:
+            return {"status": "success", "resolved_id": str(query)}
+            
+    raise HTTPException(status_code=404, detail="Document not found via any identifier strategy")
+
+@router.post("/explorer/{collection}/{doc_id}/field")
+async def add_document_field(collection: str, doc_id: str, field_name: str, field_value: Any):
+    """Inject a new field into an existing document (Schema Expansion)."""
+    col = get_collection(collection)
+    return await update_document_field(collection, doc_id, {field_name: field_value})
 
 @router.get("/config")
 async def get_system_config():

@@ -22,15 +22,14 @@ export default function LoginPage() {
     try {
       const data = await authApi.login(credentials);
 
-      // Store in local storage for session persistence
+      // Store in local storage and cookies for session persistence and middleware
       localStorage.setItem('adt_user', JSON.stringify(data));
+      document.cookie = `adt_user=${encodeURIComponent(JSON.stringify(data))}; path=/; max-age=86400; SameSite=Lax`;
 
-      if (data.role === 'developer' || data.role === 'Senior' || data.role === 'Lead' || data.role === 'Principal') {
-        if (role === 'project_manager' && ['Senior', 'Lead', 'Principal'].includes(data.experience_level)) {
-          router.push('/project-manager');
-        } else {
-          router.push('/tech/dashboard');
-        }
+      if (data.role === 'developer') {
+        router.push('/dashboard');
+      } else if (data.role === 'manager' || data.role === 'PM') {
+        router.push('/project-manager');
       } else {
         router.push('/tech/dashboard');
       }

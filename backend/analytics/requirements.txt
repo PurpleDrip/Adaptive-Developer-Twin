@@ -8,3 +8,5 @@ xgboost
 torch
 httpx
 motor
+dnspython
+redis

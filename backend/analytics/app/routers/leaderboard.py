@@ -1,31 +1,20 @@
-from fastapi import APIRouter, HTTPException
-import os
-import httpx
-from typing import List, Dict, Any
+from fastapi import APIRouter
+from app.api.clients import THGClient
 
-router = APIRouter()
-THG_URL = os.getenv("THG_URL", "http://thg-service:8000")
+router = APIRouter(prefix="/api/v1/analytics/leaderboard")
 
-@router.get("/")
+@router.get("")
 async def get_global_leaderboard(skill: str = "backend"):
     """
     Combines Skill Strength (from THG) and Influence (PageRank) 
     to create a composite ranking.
     """
-    async with httpx.AsyncClient() as client:
-        # 1. Fetch Skill Strengths
-        try:
-            skill_resp = await client.get(f"{THG_URL}/api/v1/thg/thg/leaderboard/{skill}")
-            skills_data = skill_resp.json()
-        except:
-            skills_data = []
+    # 1. Fetch Skill Strengths
+    skills_data = await THGClient.get_skills_leaderboard(skill)
 
-        # 2. Fetch Influence (PageRank)
-        try:
-            influence_resp = await client.get(f"{THG_URL}/api/v1/thg/thg/influence")
-            influence_data = {r["dev_id"]: r["influence_score"] for r in influence_resp.json()}
-        except:
-            influence_data = {}
+    # 2. Fetch Influence (PageRank)
+    raw_influence = await THGClient.get_influence()
+    influence_data = {r["dev_id"]: r["influence_score"] for r in raw_influence} if isinstance(raw_influence, list) else {}
 
     # 3. Composite Scoring: 70% Skill, 30% Influence
     leaderboard = []

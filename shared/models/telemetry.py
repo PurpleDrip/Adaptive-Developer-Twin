@@ -16,7 +16,6 @@ class SyncType(str, Enum):
 class TelemetryIngestDTO(BaseModel):
     """Payload sent by VS Code extension every 30 seconds (or on handshake)."""
     extension_id: str = Field(..., min_length=1, max_length=255)
-    user_id: str = Field(..., min_length=1, max_length=255)
     machine_id: str = Field(..., min_length=1, max_length=255)
     sync_type: SyncType = SyncType.DELTA
     
@@ -32,6 +31,13 @@ class TelemetryIngestDTO(BaseModel):
     commands_executed: int = Field(default=0, ge=0)
     idle_seconds: float = Field(default=0.0, ge=0)
     git_branch: Optional[str] = Field(default="main", max_length=255)
+    
+    # Enrichment
+    code_snippet: Optional[str] = None
+    languages_used: Dict[str, float] = Field(default_factory=dict)
+
+    class Config:
+        extra = "allow"
 
 
 class TelemetryRawDocument:
@@ -39,7 +45,6 @@ class TelemetryRawDocument:
     @staticmethod
     def create(dto: TelemetryIngestDTO) -> dict:
         return {
-            "user_id": dto.user_id,
             "extension_id": dto.extension_id,
             "machine_id": dto.machine_id,
             "sync_type": dto.sync_type,
@@ -52,6 +57,8 @@ class TelemetryRawDocument:
             "diff_payload": dto.diff_payload,
             "workspace_snapshot_url": dto.workspace_snapshot_url,
             "git_branch": dto.git_branch,
+            "code_snippet": dto.code_snippet,
+            "languages_used": dto.languages_used,
             "processed": False,
             "ingested_at": datetime.utcnow(),
         }

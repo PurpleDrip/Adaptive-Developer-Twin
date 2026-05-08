@@ -31,18 +31,13 @@
       "properties": {
         "adt.gatewayUrl": {
           "type": "string",
-          "default": "http://localhost:8000",
+          "default": "http://127.0.0.1:8000",
           "description": "URL of the ADT API Gateway"
         },
         "adt.extensionId": {
           "type": "string",
           "default": "",
           "description": "Unique Extension ID from registration"
-        },
-        "adt.userId": {
-          "type": "string",
-          "default": "",
-          "description": "Your ADT User ID"
         }
       }
     }

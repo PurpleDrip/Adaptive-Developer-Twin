@@ -4,7 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel
 from app.services.neo4j import get_neo4j_session
 
-router = APIRouter(prefix="/thg", tags=["Temporal Heterogeneous Graph"])
+router = APIRouter(prefix="/api/v1/thg", tags=["Temporal Heterogeneous Graph"])
 
 # Request/Response Models
 class SkillUpdateDTO(BaseModel):
@@ -133,7 +133,7 @@ async def update_skill(
     }
 
 # 2. Get Developer Skills (Live Profile)
-@router.get("/{dev_id}/skills", response_model=DeveloperSkills)
+@router.get("/skills/{dev_id}", response_model=DeveloperSkills)
 async def get_developer_skills(
     dev_id: str,
     session=Depends(get_neo4j_session)

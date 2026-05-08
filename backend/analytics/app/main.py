@@ -20,11 +20,11 @@ async def startup_db_client():
 async def shutdown_db_client():
     await close_mongo()
 
-app.include_router(stats.router, prefix="/api/v1/analytics/stats", tags=["stats"])
+app.include_router(stats.router, tags=["stats"])
 app.include_router(tests.router, prefix="/api/v1/analytics/tests", tags=["tests"])
 app.include_router(feedback.router, prefix="/api/v1/analytics/feedback", tags=["feedback"])
 app.include_router(hr_reports.router, prefix="/api/v1/analytics/hr-reports", tags=["hr-reports"])
-app.include_router(leaderboard.router, prefix="/api/v1/analytics/leaderboard", tags=["leaderboard"])
+app.include_router(leaderboard.router, tags=["leaderboard"])
 
 @app.get("/api/v1/analytics/health")
 async def health():

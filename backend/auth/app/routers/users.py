@@ -8,9 +8,10 @@ from datetime import datetime
 from typing import List, Optional
 from shared.models.user import UserRegistrationDTO, UserDocument, UserProfileResponse, LoginDTO
 from shared.database.mongo import get_collection
+from shared.auth.rbac import role_required
 from passlib.context import CryptContext
 
-router = APIRouter(tags=["users"])
+router = APIRouter(prefix="/api/v1/auth/users", tags=["users"])
 FUSION_URL = os.getenv("FUSION_URL", "http://fusion-service:8000")
 THG_URL = os.getenv("THG_URL", "http://thg-service:8000")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -154,7 +155,16 @@ async def validate_field(field: str, value: str):
     existing = await users_col.find_one({field: value})
     return {"available": existing is None}
 
-@router.get("/{user_id}", response_model=UserProfileResponse)
+@router.get("/all")
+async def get_all_users(role: str = Depends(role_required(["manager", "PM", "tech"]))):
+    """
+    Returns the full user directory. Restricted to Managers and Tech.
+    """
+    users_col = get_collection("users")
+    cursor = users_col.find({}, {"password_hash": 0})
+    return await cursor.to_list(length=100)
+
+@router.get("/profile/{user_id}", response_model=UserProfileResponse)
 async def get_user_profile(user_id: str):
     users_col = get_collection("users")
     user = await users_col.find_one({"user_id": user_id})
@@ -179,14 +189,37 @@ async def hardware_lock(extension_id: str, machine_id: str):
 
 @router.post("/validate-extension")
 async def validate_extension(extension_id: str, machine_id: str):
-    whitelist_col = get_collection("whitelist")
-    entry = await whitelist_col.find_one({"extension_id": extension_id, "machine_id": machine_id, "is_active": True})
-    if not entry:
-        raise HTTPException(status_code=401, detail="Invalid extension or hardware")
-    
+    """
+    Validates identity and enforces Immutable Hardware Anchor.
+    """
     users_col = get_collection("users")
+    
+    # 1. Find the user by Extension ID
     user = await users_col.find_one({"extension_id": extension_id})
-    return {"user_id": user["user_id"], "name": user["name"]}
+    if not user:
+        raise HTTPException(status_code=401, detail="Identity not found")
+        
+    # 2. Check for existing hardware lock
+    existing_lock = user.get("machine_id")
+    
+    if not existing_lock:
+        # FIRST TIME HANDSHAKE: Anchor this machine to this identity
+        # BUT: Ensure this machine isn't already anchored to someone else
+        duplicate_machine = await users_col.find_one({"machine_id": machine_id})
+        if duplicate_machine:
+            raise HTTPException(status_code=403, detail="Machine already anchored to another identity")
+            
+        await users_col.update_one(
+            {"extension_id": extension_id},
+            {"$set": {"machine_id": machine_id, "locked_at": datetime.utcnow()}}
+        )
+        return {"user_id": user["user_id"], "name": user["name"], "status": "LOCKED_TO_HARDWARE"}
+
+    # 3. Verify existing lock
+    if existing_lock != machine_id:
+        raise HTTPException(status_code=403, detail="Hardware mismatch: Identity is anchored to another machine")
+
+    return {"user_id": user["user_id"], "name": user["name"], "status": "VERIFIED"}
 
 @router.post("/assign-manager")
 async def assign_manager(developer_id: str, manager_id: str):
