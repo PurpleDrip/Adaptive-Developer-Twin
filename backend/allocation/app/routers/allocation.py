@@ -32,14 +32,17 @@ async def rank_devs(request: TaskAllocationRequest):
             task_vector = f_resp.json().get("vector", {})
         except:
             task_vector = {}
-        
+
         # Merge task_vector with required_skills (required_skills take precedence)
         combined_task_vector = {**task_vector, **request.required_skills}
-    
+
         # 2. FETCH LATEST DATA: Query all developers
         try:
-            thg_resp = await client.get(f"{THG_URL}/api/v1/thg/thg/developers")
+            thg_resp = await client.get(f"{THG_URL}/api/v1/thg/developers")
             developers = thg_resp.json()
+            if not isinstance(developers, list):
+                print(f"THG returned non-list: {developers}")
+                developers = []
         except Exception as e:
             print(f"THG fetch failed: {e}")
             developers = []
@@ -48,30 +51,89 @@ async def rank_devs(request: TaskAllocationRequest):
     ranked = []
     for dev in developers:
         skills = dev.get("skills", {})
-        conf = dev.get("confidence", 0.5)
-        
+        conf = float(dev.get("confidence", 0.5))
+
         if conf < request.min_confidence:
             continue
 
         # Calculate match using real AI vector vs graph skills
         match_score = SkillMatcher.calculate_match(combined_task_vector, skills)
-        
-        # Multi-factor score: 60% skill match, 20% confidence, 20% experience bonus
-        final_score = (match_score * 0.6) + (float(conf) * 0.2) + 0.2 # Base line
-        
+
+        # Multi-factor score: 60% skill match, 20% confidence, 20% baseline
+        skill_component = match_score * 0.6
+        conf_component = conf * 0.2
+        baseline = 0.2
+        final_score = min(1.0, skill_component + conf_component + baseline)
+
+        # Build explainability payload
+        matched = []
+        for skill_name, task_weight in combined_task_vector.items():
+            if task_weight <= 0:
+                continue
+            dev_strength = skills.get(skill_name, 0.0)
+            if dev_strength > 0:
+                matched.append({
+                    "skill": skill_name,
+                    "task_weight": round(float(task_weight), 3),
+                    "dev_strength": round(float(dev_strength), 3),
+                    "contribution": round(float(task_weight) * float(dev_strength), 3),
+                })
+        matched.sort(key=lambda m: m["contribution"], reverse=True)
+
+        top_dev_skills = sorted(skills.items(), key=lambda x: x[1], reverse=True)[:3]
+        top_dev_skills_fmt = [{"skill": s, "strength": round(float(v), 3)} for s, v in top_dev_skills]
+
         ranked.append({
             "user_id": dev["id"],
             "name": dev["name"],
-            "match_score": round(min(1.0, final_score), 4),
-            "primary_skill": max(skills, key=skills.get) if skills else "General"
+            "match_score": round(final_score, 4),
+            "primary_skill": max(skills, key=skills.get) if skills else "General",
+            "explanation": {
+                "skill_match": round(float(match_score), 4),
+                "confidence": round(conf, 4),
+                "breakdown": {
+                    "skill_component": round(skill_component, 4),
+                    "confidence_component": round(conf_component, 4),
+                    "baseline": baseline,
+                },
+                "matched_skills": matched[:5],
+                "top_dev_skills": top_dev_skills_fmt,
+            },
         })
-        
+
     ranked.sort(key=lambda x: x["match_score"], reverse=True)
-    
+
+    # Attach human-readable rationale to top 3 (XAI)
+    for idx, c in enumerate(ranked[:3]):
+        exp = c["explanation"]
+        matched = exp["matched_skills"]
+        skill_pct = int(round(exp["skill_match"] * 100))
+        conf_pct = int(round(exp["confidence"] * 100))
+
+        if matched:
+            top_two = matched[:2]
+            skill_phrase = " and ".join(
+                f"{m['skill']} ({int(round(m['dev_strength'] * 100))}%)" for m in top_two
+            )
+            rationale = (
+                f"Strongest fit at rank #{idx + 1}: {skill_pct}% cosine alignment with the task vector, "
+                f"driven by proven strength in {skill_phrase}. "
+                f"Twin confidence is {conf_pct}%, so the THG considers this profile reliable."
+            )
+        else:
+            top_skills_phrase = ", ".join(s["skill"] for s in exp["top_dev_skills"][:2]) or "general engineering"
+            rationale = (
+                f"Surfaces at rank #{idx + 1} despite no direct skill overlap with the task vector. "
+                f"Selected on the strength of adjacent expertise in {top_skills_phrase} "
+                f"and a {conf_pct}% twin confidence — a stretch assignment candidate."
+            )
+        c["explanation"]["rationale"] = rationale
+
     return {
         "task_id": request.task_id,
         "candidates": ranked,
-        "algorithm": "Semantic-Weighted-Rank-v2-Full"
+        "algorithm": "Semantic-Weighted-Rank-v2-Full",
+        "scoring_formula": "0.6 * cosine(task, skills) + 0.2 * twin_confidence + 0.2 baseline",
     }
 
 @router.post("/optimize", status_code=200)
@@ -82,7 +144,7 @@ async def optimize_allocations(tasks: List[TaskAllocationRequest]):
     """
     # 1. Fetch Developers
     async with httpx.AsyncClient() as client:
-        thg_resp = await client.get(f"{THG_URL}/api/v1/thg/thg/developers")
+        thg_resp = await client.get(f"{THG_URL}/api/v1/thg/developers")
         developers = thg_resp.json()
     
     if not tasks or not developers:
@@ -117,7 +179,7 @@ async def optimize_allocations(tasks: List[TaskAllocationRequest]):
 async def select_dev(user_id: str, task_id: str):
     async with httpx.AsyncClient() as client:
         try:
-            resp = await client.post(f"{THG_URL}/api/v1/thg/thg/record-assignment", json={
+            resp = await client.post(f"{THG_URL}/api/v1/thg/record-assignment", json={
                 "dev_id": user_id,
                 "task_id": task_id
             })

@@ -41,5 +41,65 @@ async def create_demo_test():
     print(f"[SUCCESS] Created Demo Test: {test_id}")
     print(f"[INFO] Correct answers: B, B, B, A, A, B, A, A, C, C")
 
+    # --- 2. Seed Assessment Submission ---
+    submission_doc = {
+        "submission_id": "sub_demo_001",
+        "test_id": test_id,
+        "user_id": "dev_001",
+        "answers": {"q1": "B", "q2": "B", "q3": "B", "q4": "A", "q5": "A", "q6": "B", "q7": "A", "q8": "A", "q9": "C", "q10": "C"},
+        "score": 1.0,
+        "verified_at": datetime.now(timezone.utc),
+        "is_legit": True
+    }
+    await db.test_submissions.insert_one(submission_doc)
+    print(f"[SUCCESS] Injected Perfect Submission for dev_001")
+
+    # --- 3. Seed Telemetry Raw ---
+    await db.telemetry_raw.delete_many({"user_id": "dev_001"})
+    raw_events = []
+    for i in range(10):
+        raw_events.append({
+            "event_id": f"evt_demo_{i}",
+            "user_id": "dev_001",
+            "session_id": "sesh_demo_1",
+            "timestamp": datetime.now(timezone.utc),
+            "keystroke_count": 150 + (i * 10),
+            "backspace_count": 5 + i,
+            "files_changed": ["main.py", "utils.py"],
+            "active_editor_time_ms": 60000,
+            "language": "python"
+        })
+    await db.telemetry_raw.insert_many(raw_events)
+    print(f"[SUCCESS] Injected 10 Raw Telemetry Events")
+
+    # --- 4. Seed Telemetry Batches (Analytics Data) ---
+    await db.telemetry_batches.delete_many({"user_id": "dev_001"})
+    batch_doc = {
+        "batch_id": "batch_demo_001",
+        "user_id": "dev_001",
+        "start_time": datetime.now(timezone.utc),
+        "end_time": datetime.now(timezone.utc),
+        "event_count": 10,
+        "aggregated_signals": {
+            "total_keystrokes": 5000,
+            "total_backspaces": 200,
+            "avg_wpm": 65.4,
+            "languages_used": ["python", "typescript"],
+            "total_active_time_ms": 3600000  # 1 hour
+        }
+    }
+    await db.telemetry_batches.insert_one(batch_doc)
+    print(f"[SUCCESS] Injected Telemetry Batch (WPM: 65.4, Lines ~1000)")
+
+    # --- 5. Seed Audit Logs ---
+    await db.audit_logs.delete_many({"user_id": "dev_001"})
+    audit_events = [
+        {"timestamp": datetime.now(timezone.utc), "user_id": "dev_001", "action": "LOGIN", "resource": "AuthService", "status": "SUCCESS", "metadata": {"ip": "127.0.0.1"}},
+        {"timestamp": datetime.now(timezone.utc), "user_id": "dev_001", "action": "SUBMIT_ASSESSMENT", "resource": "TaskService", "status": "SUCCESS", "metadata": {"test_id": test_id}},
+        {"timestamp": datetime.now(timezone.utc), "user_id": "dev_001", "action": "VIEW_DASHBOARD", "resource": "Frontend", "status": "SUCCESS", "metadata": {}}
+    ]
+    await db.audit_logs.insert_many(audit_events)
+    print(f"[SUCCESS] Injected 3 Audit Logs")
+
 if __name__ == "__main__":
     asyncio.run(create_demo_test())

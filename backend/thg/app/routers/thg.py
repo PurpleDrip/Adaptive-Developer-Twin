@@ -50,6 +50,12 @@ class AssignmentDTO(BaseModel):
     dev_id: str
     task_id: str
 
+class TaskCreateGraphDTO(BaseModel):
+    task_id: str
+    title: str
+    description: str
+    required_skills: Dict[str, float]
+
 def _normalize_datetime(value: Any) -> datetime:
     if isinstance(value, datetime):
         return value
@@ -243,8 +249,51 @@ async def get_all_developers(session=Depends(get_neo4j_session)):
 
 @router.post("/record-assignment", status_code=201)
 async def record_assignment(data: AssignmentDTO, session=Depends(get_neo4j_session)):
-    await session.run("MERGE (d:Developer {id:$d}) MERGE (t:Task {id:$t}) MERGE (d)-[r:ASSIGNED_TO]->(t) SET r.at = datetime()", d=data.dev_id, t=data.task_id)
+    # Remove any previous ASSIGNED_TO relationships for this task, then create the new one
+    await session.run("""
+        MATCH (t:Task {id: $t})
+        OPTIONAL MATCH ()-[old_r:ASSIGNED_TO]->(t)
+        DELETE old_r
+        WITH t
+        MATCH (d:Developer {id: $d})
+        MERGE (d)-[r:ASSIGNED_TO]->(t)
+        SET r.at = datetime()
+    """, d=data.dev_id, t=data.task_id)
     return {"status": "success"}
+
+@router.post("/task/create", status_code=201)
+async def create_task_in_graph(data: TaskCreateGraphDTO, session=Depends(get_neo4j_session)):
+    await session.run("""
+        MERGE (t:Task {id: $id})
+        SET t.title = $title, t.description = $desc
+        WITH t
+        UNWIND $skills AS req
+        MERGE (s:Skill {name: req.skill})
+        MERGE (t)-[r:REQUIRES_SKILL]->(s)
+        SET r.weight = req.weight
+    """, id=data.task_id, title=data.title, desc=data.description, skills=[{"skill": k, "weight": v} for k, v in data.required_skills.items()])
+    return {"status": "task_created"}
+
+@router.get("/task/user/{dev_id}")
+async def get_user_tasks_from_graph(dev_id: str, session=Depends(get_neo4j_session)):
+    result = await session.run("""
+        MATCH (d:Developer {id: $dev_id})-[r:ASSIGNED_TO]->(t:Task)
+        RETURN t.id AS task_id, t.title AS title, t.description AS description, r.at AS assigned_at
+        ORDER BY r.at DESC
+    """, dev_id=dev_id)
+    records = await result.data()
+    return [{"task_id": r["task_id"], "title": r["title"], "description": r["description"], "assigned_at": _normalize_datetime(r["assigned_at"])} for r in records]
+
+@router.get("/manager/{dev_id}")
+async def get_manager_for_dev(dev_id: str, session=Depends(get_neo4j_session)):
+    result = await session.run("""
+        MATCH (m:Manager)-[:MANAGES]->(d:Developer {id: $dev_id})
+        RETURN m.id AS manager_id
+    """, dev_id=dev_id)
+    record = await result.single()
+    if record:
+        return {"manager_id": record["manager_id"]}
+    return {"manager_id": None}
 
 @router.post("/generate-demo-data")
 async def generate_demo_graph(session=Depends(get_neo4j_session)):

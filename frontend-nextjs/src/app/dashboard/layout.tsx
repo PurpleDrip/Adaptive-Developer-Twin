@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, ClipboardList, Activity } from 'lucide-react';
+import { LayoutDashboard, Users, Activity, LogOut } from 'lucide-react';
 
 const Sidebar = () => {
   const pathname = usePathname();
@@ -50,7 +50,7 @@ const Sidebar = () => {
         )}
       </nav>
 
-      <div className="p-6 border-t border-zinc-800">
+      <div className="p-6 border-t border-zinc-800 space-y-4">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center font-bold text-xs">
             {getInitials(user?.name || 'Dev')}
@@ -60,6 +60,16 @@ const Sidebar = () => {
             <p className="text-[10px] text-gray-500 uppercase tracking-widest">{user?.role || "Team Member"}</p>
           </div>
         </div>
+        <button
+          onClick={() => {
+            localStorage.removeItem('adt_user');
+            document.cookie = 'adt_user=; Max-Age=0; path=/';
+            window.location.href = '/login';
+          }}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition-all rounded-lg text-xs font-medium"
+        >
+          <LogOut size={14} /> Logout
+        </button>
       </div>
     </div>
   );

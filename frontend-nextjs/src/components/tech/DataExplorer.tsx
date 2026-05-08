@@ -5,9 +5,7 @@ import {
     Database, Search, Filter, Save, ChevronLeft, ChevronRight, 
     Edit3, Loader2, Plus, X, Check, RefreshCw, Terminal 
 } from 'lucide-react';
-import axios from 'axios';
-
-const GATEWAY_URL = "http://127.0.0.1:8000/api/v1";
+import { api } from '@/lib/api';
 
 export const DataExplorer: React.FC = () => {
     const [collections, setCollections] = useState<string[]>([]);
@@ -32,7 +30,7 @@ export const DataExplorer: React.FC = () => {
 
     const fetchCollections = async () => {
         try {
-            const resp = await axios.get(`${GATEWAY_URL}/auth/admin/explorer/collections`);
+            const resp = await api.get(`/auth/admin/explorer/collections`);
             setCollections(resp.data.collections);
         } catch (err) { console.error(err); }
     };
@@ -45,7 +43,7 @@ export const DataExplorer: React.FC = () => {
                 params.filter_key = filter.key;
                 params.filter_val = filter.val;
             }
-            const resp = await axios.get(`${GATEWAY_URL}/auth/admin/explorer/${selectedCollection}`, { params });
+            const resp = await api.get(`/auth/admin/explorer/${selectedCollection}`, { params });
             setData(resp.data.data);
         } catch (err) { console.error(err); }
         setLoading(false);
@@ -59,7 +57,7 @@ export const DataExplorer: React.FC = () => {
     const saveEdit = async () => {
         if (!editingCell) return;
         try {
-            await axios.patch(`${GATEWAY_URL}/auth/admin/explorer/${selectedCollection}/${editingCell.id}`, {
+            await api.patch(`/auth/admin/explorer/${selectedCollection}/${editingCell.id}`, {
                 [editingCell.field]: editValue
             });
             setEditingCell(null);
@@ -72,7 +70,7 @@ export const DataExplorer: React.FC = () => {
     const handleAddField = async (docId: string) => {
         if (!newField.name) return;
         try {
-            await axios.post(`${GATEWAY_URL}/auth/admin/explorer/${selectedCollection}/${docId}/field`, null, {
+            await api.post(`/auth/admin/explorer/${selectedCollection}/${docId}/field`, null, {
                 params: { field_name: newField.name, field_value: newField.value }
             });
             setIsAddingField(null);

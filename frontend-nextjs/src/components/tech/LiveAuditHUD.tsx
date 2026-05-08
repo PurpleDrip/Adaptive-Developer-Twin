@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Terminal, Shield, Zap, Info, AlertCircle } from 'lucide-react';
+import axios from 'axios';
 
 interface AuditLog {
     id: string;
@@ -17,6 +18,12 @@ export const LiveAuditHUD: React.FC = () => {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        // Fetch Historical Logs first
+        axios.get('http://127.0.0.1:8007/api/v1/monitoring/audit-log')
+            .then(res => setLogs(res.data.map((l: any) => ({ ...l, id: l._id || l.id }))))
+            .catch(err => console.error("Failed to fetch historical audit logs", err));
+
+        // Connect to Live WebSocket
         const ws = new WebSocket(`ws://127.0.0.1:8007/api/v1/monitoring/ws/audit`);
 
         ws.onopen = () => setIsConnected(true);

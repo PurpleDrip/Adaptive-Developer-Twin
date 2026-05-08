@@ -12,7 +12,7 @@ async def get_audit_trail(user_id: str = None, action: str = None, limit: int = 
     """
     Fetches the global audit trail.
     """
-    db = get_collection("audit_log").database
+    db = get_collection("audit_logs").database
     logger = AuditLogger(db)
     
     if action:

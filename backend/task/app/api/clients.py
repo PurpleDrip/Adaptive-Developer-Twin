@@ -7,6 +7,33 @@ logger = logging.getLogger("task-service.clients")
 ALLOCATION_URL = os.getenv("ALLOCATION_URL", "http://127.0.0.1:8009")
 THG_URL = os.getenv("THG_URL", "http://127.0.0.1:8008")
 FUSION_URL = os.getenv("FUSION_URL", "http://127.0.0.1:8005")
+AUTH_URL = os.getenv("AUTH_URL", "http://127.0.0.1:8001")
+
+
+class AuthClient:
+    @staticmethod
+    async def get_squad_ids(manager_id: str) -> list:
+        """
+        Returns the list of dev user_ids belonging to a manager's squad.
+        Hits the auth-service squad endpoint and forwards the manager role
+        so RBAC accepts the request.
+        """
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(
+                    f"{AUTH_URL}/api/v1/auth/users/squad/{manager_id}",
+                    headers={"X-User-Role": "manager"},
+                )
+                if resp.status_code == 200:
+                    squad = resp.json() or []
+                    ids = [d.get("user_id") for d in squad if d.get("user_id")]
+                    logger.info(f"[SQUAD] Manager {manager_id} -> {len(ids)} devs")
+                    return ids
+                logger.warning(f"[SQUAD] auth-service returned {resp.status_code} for manager {manager_id}")
+                return []
+        except Exception as e:
+            logger.error(f"[SQUAD] auth-service unreachable: {e}")
+            return []
 
 class AllocationClient:
     @staticmethod
@@ -40,6 +67,28 @@ class THGClient:
                 logger.info(f"[THG-SYNC] Assignment recorded: {dev_id} -> {task_id} (status={resp.status_code})")
         except Exception as e:
             logger.error(f"[THG-SYNC] Failed to record assignment {dev_id} -> {task_id}: {e}")
+
+    @staticmethod
+    async def create_task(task_id: str, title: str, description: str, required_skills: dict):
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(f"{THG_URL}/api/v1/thg/task/create", json={
+                    "task_id": task_id, "title": title, "description": description, "required_skills": required_skills
+                })
+                logger.info(f"[THG-SYNC] Task {task_id} created in graph")
+        except Exception as e:
+            logger.error(f"[THG-SYNC] Failed to create task {task_id}: {e}")
+
+    @staticmethod
+    async def get_user_tasks(dev_id: str):
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(f"{THG_URL}/api/v1/thg/task/user/{dev_id}")
+                if resp.status_code == 200:
+                    return resp.json()
+        except Exception as e:
+            logger.error(f"[THG-SYNC] Failed to get user tasks for {dev_id}: {e}")
+        return []
 
 class FusionClient:
     @staticmethod

@@ -20,6 +20,7 @@ export default function DeveloperDashboard() {
     const [leaderboard, setLeaderboard] = useState<any[]>([]);
     const [notifications, setNotifications] = useState<any[]>([]);
     const [user, setUser] = useState<any>(null);
+    const [manager, setManager] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -28,6 +29,9 @@ export default function DeveloperDashboard() {
                 const sessionStr = localStorage.getItem('adt_user');
                 if (!sessionStr) { window.location.href = '/login?role=developer'; return; }
                 const session = JSON.parse(sessionStr);
+                if (session.role === 'manager' || session.role === 'PM') {
+                    window.location.href = '/project-manager'; return;
+                }
                 const userId = session.user_id;
 
                 // 1. Skills from THG
@@ -38,10 +42,16 @@ export default function DeveloperDashboard() {
                     })));
                 } catch { console.warn('Skills not available yet'); }
 
-                // 2. User Profile
+                // 2. User Profile & Manager Relationship (from THG)
                 try {
                     const userResp = await authApi.getProfile(userId);
                     setUser(userResp.data);
+
+                    const mgrRelResp = await thgApi.getManagerForDev(userId);
+                    if (mgrRelResp.data && mgrRelResp.data.manager_id) {
+                        const mgrProfile = await authApi.getProfile(mgrRelResp.data.manager_id);
+                        setManager(mgrProfile.data);
+                    }
                 } catch { setUser({ name: session.name, user_id: userId }); }
 
                 // 3. Allotted Task
@@ -102,7 +112,14 @@ export default function DeveloperDashboard() {
                     <h1 className="text-3xl font-bold text-white">
                         Welcome back, <span className="text-blue-500">{user?.name || "Developer"}</span>
                     </h1>
-                    <p className="text-sm text-zinc-500 mt-1">Your neural twin is active and tracking progress.</p>
+                    <p className="text-sm text-zinc-500 mt-1 flex items-center gap-2">
+                        Your neural twin is active. 
+                        {manager && (
+                            <span className="flex items-center gap-1 bg-zinc-800/50 px-2 py-0.5 rounded text-xs text-blue-400">
+                                <User size={12} /> Managed by: {manager.name}
+                            </span>
+                        )}
+                    </p>
                 </div>
                 <div className="text-right">
                     <p className="text-xs text-zinc-500 mb-1">Global Rank</p>

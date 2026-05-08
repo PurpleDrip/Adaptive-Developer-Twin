@@ -25,7 +25,7 @@ class SkillMatcher:
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resp = await client.post(
-                    f"{cls.FUSION_URL}/api/v1/fusion/fusion/analyze-text", 
+                    f"{cls.FUSION_URL}/api/v1/fusion/fusion/analyze-text",
                     json={"text": task_desc}
                 )
                 resp.raise_for_status()

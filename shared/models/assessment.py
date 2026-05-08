@@ -6,7 +6,7 @@ class Question(BaseModel):
     id: str
     question: str
     options: List[str]
-    correct_option: int # 0-3 index
+    correct_option: str # "A", "B", "C", "D"
     domain: str
 
 class WeeklyTest(BaseModel):
@@ -19,10 +19,10 @@ class WeeklyTest(BaseModel):
     is_active: bool = True
 
 class TestSubmission(BaseModel):
-    submission_id: str
+    submission_id: Optional[str] = None
     test_id: str
     user_id: str
-    answers: Dict[str, int] # question_id -> selected_option
+    answers: Dict[str, str] # question_id -> selected_option
     score: float = 0.0
     verified_at: datetime = Field(default_factory=datetime.utcnow)
     is_legit: bool = True # Flagged by anti-cheat logic

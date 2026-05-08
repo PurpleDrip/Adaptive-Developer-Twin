@@ -23,7 +23,7 @@ class AuditLogger:
         Args:
             db: Motor database instance from shared.database.mongo
         """
-        self._collection = db["audit_log"]
+        self._collection = db["audit_logs"]
         # Redis for Real-time WebSocket broadcasting
         self.r_client = redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True)
 

@@ -3,8 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import {
     Terminal as TermIcon, Shield, Users, Command,
-    Activity, Search, UserPlus, Database, Server, 
-    Globe, Lock, List, XCircle, Edit3, Trash2
+    Activity, Search, UserPlus, Database, Server,
+    Globe, Lock, List, XCircle, Edit3, Trash2, LogOut
 } from 'lucide-react';
 import axios from 'axios';
 import {
@@ -125,7 +125,16 @@ export default function TechSupportDashboard() {
                         </button>
                     ))}
                 </nav>
-                <div className="w-24" />
+                <button
+                    onClick={() => {
+                        localStorage.removeItem('adt_user');
+                        document.cookie = 'adt_user=; Max-Age=0; path=/';
+                        window.location.href = '/login';
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition-all rounded-lg text-xs font-medium"
+                >
+                    <LogOut size={14} /> Logout
+                </button>
             </header>
 
             <main className="h-[calc(100vh-200px)] animate-fade">

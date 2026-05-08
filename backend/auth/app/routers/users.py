@@ -187,7 +187,7 @@ async def get_all_users(role: str = Depends(role_required(["manager", "PM", "tec
     Returns the full user directory. Restricted to Managers and Tech.
     """
     users_col = get_collection("users")
-    cursor = users_col.find({}, {"password_hash": 0})
+    cursor = users_col.find({}, {"password_hash": 0, "_id": 0})
     return await cursor.to_list(length=100)
 
 @router.get("/squad/{manager_id}")
@@ -197,16 +197,24 @@ async def get_manager_squad(manager_id: str, role: str = Depends(role_required([
     Used for isolated squad oversight.
     """
     users_col = get_collection("users")
-    cursor = users_col.find({"manager_id": manager_id, "role": "developer"}, {"password_hash": 0})
+    cursor = users_col.find({"manager_id": manager_id, "role": "developer"}, {"password_hash": 0, "_id": 0})
     return await cursor.to_list(length=100)
 
-@router.get("/profile/{user_id}", response_model=UserProfileResponse)
+@router.get("/profile/{user_id}")
 async def get_user_profile(user_id: str):
-    users_col = get_collection("users")
-    user = await users_col.find_one({"user_id": user_id})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+    """
+    Polymorphic profile lookup across users, managers, and tech_staff collections.
+    """
+    for col_name, default_role in (("users", "developer"), ("managers", "manager"), ("tech_staff", "tech")):
+        col = get_collection(col_name)
+        doc = await col.find_one({"user_id": user_id}, {"password_hash": 0, "_id": 0})
+        if doc:
+            doc.setdefault("role", default_role)
+            doc.setdefault("extension_id", "N/A")
+            doc.setdefault("strong_domains", [])
+            doc.setdefault("experience_level", "Senior" if default_role != "developer" else "Junior")
+            return doc
+    raise HTTPException(status_code=404, detail="User not found")
 
 @router.post("/hardware-lock")
 async def hardware_lock(extension_id: str, machine_id: str):

@@ -1,4 +1,4 @@
-from fastapi import HTTPException, Depends, status
+from fastapi import HTTPException, Depends, status, Request
 from typing import List
 import json
 import os
@@ -16,6 +16,7 @@ def role_required(allowed_roles: List[str]):
         return True
     return role_checker
 
-async def get_current_role(user_role: str = "developer"):
-    # This will be integrated with the Auth Service's session validation
+async def get_current_role(request: Request):
+    # This expects the API Gateway or frontend to forward the role header
+    user_role = request.headers.get("X-User-Role", "developer")
     return user_role
