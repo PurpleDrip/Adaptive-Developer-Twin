@@ -9,6 +9,21 @@ import {
 import { authApi, taskApi, analyticsApi, assessmentApi } from '@/lib/api';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
+// Safely extract array response
+const safeArray = (data: any): any[] => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.detail)) return [];
+    return [];
+};
+
+// Safely extract object response
+const safeObject = (data: any): any => {
+    if (!data) return null;
+    if (typeof data !== 'object') return null;
+    if (data?.type && data?.loc && data?.msg) return null;
+    return data;
+};
+
 type QuestionDraft = {
     id: string;
     question: string;
@@ -52,23 +67,26 @@ export default function ProjectManagerDashboard() {
         const fetchOrgData = async () => {
             try {
                 const sessionStr = localStorage.getItem('adt_user');
-                if (!sessionStr) { window.location.href = '/login?role=project_manager'; return; }
+                if (!sessionStr) { window.location.replace('/login?role=project_manager'); return; }
                 const session = JSON.parse(sessionStr);
                 if (session.role !== 'manager' && session.role !== 'PM') {
-                    window.location.href = '/login?role=project_manager'; return;
+                    window.location.replace('/login?role=project_manager'); return;
                 }
 
                 const mgrResp = await authApi.getProfile(session.user_id);
-                setManager(mgrResp.data);
+                const mgrData = safeObject(mgrResp.data);
+                if (mgrData) setManager(mgrData);
 
                 const resp = await authApi.getSquad(session.user_id);
-                const devList = resp.data;
+                const devList = safeArray(resp.data);
 
                 const devsWithPerformance = await Promise.all(devList.map(async (dev: any) => {
                     try {
                         const perfResp = await analyticsApi.getSummary(dev.user_id);
                         const taskResp = await taskApi.getUserTasks(dev.user_id);
-                        return { ...dev, performance: perfResp.data, current_task: taskResp.data[0] || null };
+                        const perf = safeObject(perfResp.data) || {};
+                        const tasks = safeArray(taskResp.data);
+                        return { ...dev, performance: perf, current_task: tasks[0] || null };
                     } catch { return { ...dev, performance: {}, current_task: null }; }
                 }));
 
@@ -225,7 +243,7 @@ export default function ProjectManagerDashboard() {
     const handleLogout = () => {
         localStorage.removeItem('adt_user');
         document.cookie = 'adt_user=; Max-Age=0; path=/';
-        window.location.href = '/login?role=project_manager';
+        window.location.replace('/login?role=project_manager');
     };
 
     const filteredDevs = devs.filter(d =>

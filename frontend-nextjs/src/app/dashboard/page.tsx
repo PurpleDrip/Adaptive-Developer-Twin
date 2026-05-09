@@ -13,6 +13,21 @@ import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
+// Safely extract array response, return empty array on error
+const safeArray = (data: any): any[] => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.detail)) return []; // Pydantic error format
+    return [];
+};
+
+// Safely extract object response, return null on error
+const safeObject = (data: any): any => {
+    if (!data) return null;
+    if (typeof data !== 'object') return null;
+    if (data?.type && data?.loc && data?.msg) return null; // Pydantic error format
+    return data;
+};
+
 export default function DeveloperDashboard() {
     const [skills, setSkills] = useState<any[]>([]);
     const [leaderboard, setLeaderboard] = useState<any[]>([]);
@@ -35,7 +50,7 @@ export default function DeveloperDashboard() {
         const fetchData = async () => {
             try {
                 const sessionStr = localStorage.getItem('adt_user');
-                if (!sessionStr) { window.location.href = '/login?role=developer'; return; }
+                if (!sessionStr) { window.location.replace('/login?role=developer'); return; }
                 const session = JSON.parse(sessionStr);
                 if (session.role === 'manager' || session.role === 'PM') {
                     window.location.href = '/project-manager'; return;
@@ -44,52 +59,67 @@ export default function DeveloperDashboard() {
 
                 try {
                     const userResp = await authApi.getProfile(userId);
-                    setUser(userResp.data);
+                    const userData = safeObject(userResp.data);
+                    if (userData?.user_id) setUser(userData);
+
                     const mgrRelResp = await thgApi.getManagerForDev(userId);
-                    if (mgrRelResp.data?.manager_id) {
-                        const mgrProfile = await authApi.getProfile(mgrRelResp.data.manager_id);
-                        setManager(mgrProfile.data);
+                    const mgrRel = safeObject(mgrRelResp.data);
+                    if (mgrRel?.manager_id) {
+                        const mgrProfile = await authApi.getProfile(mgrRel.manager_id);
+                        const mgrData = safeObject(mgrProfile.data);
+                        if (mgrData?.user_id) setManager(mgrData);
                     }
                 } catch { setUser({ name: session.name, user_id: userId }); }
 
                 try {
                     const taskResp = await taskApi.getUserTasks(userId);
-                    if (taskResp.data.length > 0) setTask(taskResp.data[0]);
+                    const tasks = safeArray(taskResp.data);
+                    if (tasks.length > 0) setTask(tasks[0]);
                 } catch { console.warn('Tasks not available'); }
 
                 try {
                     const notifResp = await authApi.getNotifications(userId);
-                    setNotifications(notifResp.data);
+                    setNotifications(safeArray(notifResp.data));
                 } catch { setNotifications([]); }
 
                 try {
                     const statsResp = await analyticsApi.getSummary(userId);
-                    const s = statsResp.data;
-                    setMetrics({
-                        wpm: s.wpm, active_hours: s.active_hours, lines: s.lines,
-                        rank: s.overall_rank, percentile: s.overall_rank_percentile,
-                        velocity: s.learning_velocity, top_skill: s.top_skills?.[0] || 'Backend'
-                    });
+                    const s = safeObject(statsResp.data);
+                    if (s?.wpm !== undefined) {
+                        setMetrics({
+                            wpm: s.wpm, active_hours: s.active_hours, lines: s.lines,
+                            rank: s.overall_rank, percentile: s.overall_rank_percentile,
+                            velocity: s.learning_velocity, top_skill: s.top_skills?.[0] || 'Backend'
+                        });
+                    }
                 } catch { console.warn('Analytics not available'); }
 
                 try {
                     const skillResp = await thgApi.getSkills(userId);
-                    setSkills(skillResp.data.skills.map((s: any) => ({
-                        subject: s.name, A: Math.round(s.strength * 100)
-                    })));
+                    const skillData = safeObject(skillResp.data);
+                    if (Array.isArray(skillData?.skills)) {
+                        setSkills(skillData.skills.map((s: any) => ({
+                            subject: s.name, A: Math.round(s.strength * 100)
+                        })));
+                    }
                 } catch { console.warn('Skills not available'); }
 
                 try {
                     const lbResp = await analyticsApi.getLeaderboard('Python');
-                    setLeaderboard(lbResp.data);
+                    setLeaderboard(safeArray(lbResp.data));
                 } catch { console.warn('Leaderboard not available'); }
 
                 try {
                     const testsResp = await assessmentApi.listActive();
-                    setTests(testsResp.data);
+                    const testsList = safeArray(testsResp.data);
+                    setTests(testsList);
+
                     const subsResp = await assessmentApi.getMySubmissions(userId);
+                    const subsList = safeArray(subsResp.data);
                     const subMap: Record<string, any> = {};
-                    for (const sub of subsResp.data) subMap[sub.test_id] = sub;
+                    for (const sub of subsList) {
+                        if (sub?.test_id) subMap[sub.test_id] = sub;
+                    }
                     setMySubmissions(subMap);
                 } catch { console.warn('Tests not available'); }
 
@@ -124,7 +154,7 @@ export default function DeveloperDashboard() {
     const logout = () => {
         localStorage.removeItem('adt_user');
         document.cookie = 'adt_user=; Max-Age=0; path=/';
-        window.location.href = '/login';
+        window.location.replace('/login');
     };
 
     if (loading) return (

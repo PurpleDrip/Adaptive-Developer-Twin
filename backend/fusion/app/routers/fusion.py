@@ -145,12 +145,16 @@ async def analyze_project(data: Dict[str, str]):
         async with httpx.AsyncClient() as client:
             for skill, score in result.get("skill_signals", {}).items():
                 if score > 0.1:
-                    await client.post(f"{THG_URL}/api/v1/thg/thg/update", json={
-                        "dev_id": user_id,
-                        "skill_name": skill,
-                        "strength": score,
-                        "confidence": 0.5 # Initial confidence for project analysis
-                    })
+                    try:
+                        resp = await client.post(f"{THG_URL}/api/v1/thg/update", json={
+                            "dev_id": user_id,
+                            "skill_name": skill,
+                            "strength": score,
+                            "confidence": 0.5  # Initial confidence for project analysis
+                        })
+                        logger.info(f"[FUSION] Pushed skill {skill}={score:.2f} to THG for {user_id} (status={resp.status_code})")
+                    except Exception as e:
+                        logger.error(f"[FUSION] Failed to push skill {skill} to THG for {user_id}: {e}")
     
     return result
 

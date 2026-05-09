@@ -6,35 +6,44 @@ let sender: TelemetrySender;
 let statusBarItem: vscode.StatusBarItem;
 
 export async function activate(context: vscode.ExtensionContext) {
-    vscode.window.showWarningMessage('ADT Extension activated.');
-
-    // 1. Show machine ID for dev-phase hardware locking
+    // 1. Show machine ID prominently
     const mid = vscode.env.machineId;
-    vscode.window.showWarningMessage(`[ADT Dev] Machine ID: ${mid}`);
+    vscode.window.showInformationMessage(
+        `📌 ADT Machine ID: ${mid}\n\nCopy this ID if you need to re-register this machine.`
+    );
 
     // 2. Initialize Telemetry Sender
     sender = new TelemetrySender(context);
     sender.start();
 
     // 3. Setup Status Bar
-    const extensionId = await context.secrets.get('adt.extensionId');
+    let extensionId = await context.secrets.get('adt.extensionId');
     statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
     statusBarItem.text = extensionId ? '$(pulse) ADT: Connected' : '$(alert) ADT: Not Connected';
-    statusBarItem.tooltip = extensionId ? 'ADT is monitoring your twin' : 'Click to connect your Extension ID';
+    statusBarItem.tooltip = extensionId
+        ? `ADT Connected\nExtension ID: ${extensionId}\nMachine: ${mid.slice(0, 8)}…`
+        : `ADT Not Connected\nMachine: ${mid.slice(0, 8)}…\n\nClick to register Extension ID`;
     statusBarItem.command = 'adt.connectAccount';
     statusBarItem.show();
     context.subscriptions.push(statusBarItem);
 
-    // 4. Prompt to connect if no Extension ID stored
+    // 4. Modal prompt if no Extension ID stored
     if (!extensionId) {
-        vscode.window.showWarningMessage(
-            'ADT: No Extension ID found. Connect your twin to start monitoring.',
-            'Connect Now'
-        ).then(selection => {
-            if (selection === 'Connect Now') {
-                vscode.commands.executeCommand('adt.connectAccount');
-            }
-        });
+        const response = await vscode.window.showInformationMessage(
+            'ADT: This machine is not yet registered. Register your Extension ID to enable neural twin monitoring.',
+            { modal: true },
+            'Register Now',
+            'Later'
+        );
+
+        if (response === 'Register Now') {
+            vscode.commands.executeCommand('adt.connectAccount');
+        }
+    } else {
+        // Show connection status if already connected
+        vscode.window.showInformationMessage(
+            `✓ ADT Connected | Extension: ${extensionId} | Machine: ${mid.slice(0, 8)}…`
+        );
     }
 
     // 5. Register Connect Command
@@ -67,18 +76,27 @@ export async function activate(context: vscode.ExtensionContext) {
                 if (resp.data.status === 'locked' || resp.data.status === 'verified') {
                     await context.secrets.store('adt.extensionId', inputId.trim());
                     statusBarItem.text = '$(pulse) ADT: Connected';
+                    statusBarItem.tooltip = `ADT Connected\nExtension ID: ${inputId.trim()}\nMachine: ${machineId.slice(0, 8)}…`;
+
                     vscode.window.showInformationMessage(
-                        `ADT: Hardware lock verified. Twin is now active for Machine ${machineId.slice(0, 8)}…`
+                        `✓ Hardware Lock Verified!\n\nYour neural twin is now active on this machine.`,
+                        { modal: false }
                     );
                     // Restart telemetry with the new ID (triggers INITIAL sync)
                     sender.stop();
                     sender.start();
                 } else {
-                    vscode.window.showErrorMessage('ADT: Handshake rejected — unexpected server response.');
+                    vscode.window.showErrorMessage(
+                        `✗ Hardware Lock Failed\n\nServer returned: ${resp.data.status}\n\nPlease verify your Extension ID and try again.`,
+                        { modal: true }
+                    );
                 }
             } catch (e: any) {
                 const detail = e?.response?.data?.detail || e?.message || 'Unknown error';
-                vscode.window.showErrorMessage(`ADT: Handshake failed — ${detail}`);
+                vscode.window.showErrorMessage(
+                    `✗ Connection Failed\n\n${detail}\n\nMake sure:\n1. Extension ID is correct\n2. Server is running\n3. Check network connectivity`,
+                    { modal: true }
+                );
             }
         });
     });

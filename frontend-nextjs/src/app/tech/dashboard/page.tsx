@@ -136,7 +136,7 @@ export default function TechSupportDashboard() {
                     onClick={() => {
                         localStorage.removeItem('adt_user');
                         document.cookie = 'adt_user=; Max-Age=0; path=/';
-                        window.location.href = '/login';
+                        window.location.replace('/login');
                     }}
                     className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition-all rounded-lg text-xs font-medium"
                 >
