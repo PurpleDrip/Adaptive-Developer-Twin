@@ -15,8 +15,8 @@ import logging
 logger = logging.getLogger("auth-service.users")
 
 router = APIRouter(prefix="/api/v1/auth/users", tags=["users"])
-FUSION_URL = os.getenv("FUSION_URL", "http://fusion-service:8000")
-THG_URL = os.getenv("THG_URL", "http://thg-service:8000")
+FUSION_URL = os.getenv("FUSION_URL", "http://127.0.0.1:8005")
+THG_URL = os.getenv("THG_URL", "http://127.0.0.1:8008")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 r_client = redis.from_url(REDIS_URL, decode_responses=True)
@@ -120,16 +120,17 @@ async def register_user(dto: UserRegistrationDTO, background_tasks: BackgroundTa
     
     # Initialize in THG (Neo4j)
     try:
-        async with httpx.AsyncClient() as client:
-            await client.post(f"{THG_URL}/api/v1/thg/create-dev", json={
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(f"{THG_URL}/api/v1/thg/create-dev", json={
                 "dev_id": user_id,
                 "name": dto.name,
                 "bio": "Expert in " + ", ".join(dto.strong_domains),
                 "gender": dto.gender,
                 "primary_domain": dto.strong_domains[0] if dto.strong_domains else "backend"
             })
+            logger.info(f"[THG] Developer node created for {user_id} (status={resp.status_code})")
     except Exception as e:
-        print(f"THG Init failed: {e}")
+        logger.error(f"[THG] create-dev failed for {user_id}: {e}")
     
     # Trigger Project Analysis in background
     if dto.github_project_urls:
@@ -150,12 +151,13 @@ async def trigger_project_analysis(user_id: str, urls: List[str]):
     async with httpx.AsyncClient(timeout=300.0) as client:
         for url in urls:
             try:
-                await client.post(f"{FUSION_URL}/api/v1/fusion/fusion/analyze-project", json={
+                resp = await client.post(f"{FUSION_URL}/api/v1/fusion/analyze-project", json={
                     "user_id": user_id,
                     "github_url": url
                 })
+                logger.info(f"[FUSION] Project analysis for {url}: status={resp.status_code}")
             except Exception as e:
-                print(f"Project analysis for {url} failed: {e}")
+                logger.error(f"[FUSION] Project analysis for {url} failed: {e}")
     
     await users_col.update_one({"user_id": user_id}, {"$set": {"project_analysis_status": "completed"}})
 
@@ -277,7 +279,8 @@ async def assign_manager(developer_id: str, manager_id: str):
     await users_col.update_one({"user_id": developer_id}, {"$set": {"manager_id": manager_id}})
     
     try:
-        async with httpx.AsyncClient() as client:
-            await client.post(f"{THG_URL}/api/v1/thg/thg/link-manager-dev", json={"manager_id": manager_id, "dev_id": developer_id})
-    except Exception: pass
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            await client.post(f"{THG_URL}/api/v1/thg/link-manager-dev", json={"manager_id": manager_id, "dev_id": developer_id})
+    except Exception as e:
+        logger.error(f"[THG] link-manager-dev failed: {e}")
     return {"status": "success"}
