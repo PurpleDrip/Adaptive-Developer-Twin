@@ -1,14 +1,14 @@
 {
   "main": {
-    "id": "852045e154053d32",
+    "id": "12fcbe63afbc1734",
     "type": "split",
     "children": [
       {
-        "id": "d4ece24c6160b005",
+        "id": "b6d5437077f7a578",
         "type": "tabs",
         "children": [
           {
-            "id": "d8a4482a17ccf71d",
+            "id": "a0ca6711fb042c42",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -23,15 +23,15 @@
     "direction": "vertical"
   },
   "left": {
-    "id": "7eb31b857b000c79",
+    "id": "2acbbbf5c1146a92",
     "type": "split",
     "children": [
       {
-        "id": "3cc8f921f7355a79",
+        "id": "4169def5cd0b8e53",
         "type": "tabs",
         "children": [
           {
-            "id": "8b16d90eb18159fe",
+            "id": "6689d5fbd2241a76",
             "type": "leaf",
             "state": {
               "type": "file-explorer",
@@ -44,7 +44,7 @@
             }
           },
           {
-            "id": "d3932061bf3fd0f4",
+            "id": "b0978085da33d07e",
             "type": "leaf",
             "state": {
               "type": "search",
@@ -61,7 +61,7 @@
             }
           },
           {
-            "id": "ca3cb249c8a5ae7a",
+            "id": "bd4fe607384682ef",
             "type": "leaf",
             "state": {
               "type": "bookmarks",
@@ -77,20 +77,19 @@
     "width": 300
   },
   "right": {
-    "id": "3a34b9cefc10eaef",
+    "id": "59aebe4de0137aa2",
     "type": "split",
     "children": [
       {
-        "id": "cb1f59d33a4b3367",
+        "id": "db8fcbb2c859e0f8",
         "type": "tabs",
         "children": [
           {
-            "id": "66345392bc748d62",
+            "id": "ac5bff37f980dcc9",
             "type": "leaf",
             "state": {
               "type": "backlink",
               "state": {
-                "file": "01 - Overview/_MOC.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -100,25 +99,24 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for _MOC"
+              "title": "Backlinks"
             }
           },
           {
-            "id": "32cbffa9dbcfa17d",
+            "id": "a1df13ad5fdf7f87",
             "type": "leaf",
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "01 - Overview/_MOC.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from _MOC"
+              "title": "Outgoing links"
             }
           },
           {
-            "id": "0f49395259d83971",
+            "id": "9d4746640e2c3718",
             "type": "leaf",
             "state": {
               "type": "tag",
@@ -133,7 +131,7 @@
             }
           },
           {
-            "id": "8b0dcc93792912cc",
+            "id": "d99b31a8e6c7b4e3",
             "type": "leaf",
             "state": {
               "type": "all-properties",
@@ -147,18 +145,17 @@
             }
           },
           {
-            "id": "b696df464c132efe",
+            "id": "3c1fafb8d2e20b77",
             "type": "leaf",
             "state": {
               "type": "outline",
               "state": {
-                "file": "01 - Overview/_MOC.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of _MOC"
+              "title": "Outline"
             }
           }
         ]
@@ -179,43 +176,26 @@
       "bases:Create new base": false
     }
   },
-  "active": "d8a4482a17ccf71d",
+  "active": "6689d5fbd2241a76",
   "lastOpenFiles": [
-    "13 - Yet to Implement/Backend - Telemetry - Lift Batch Limit.md",
-    "13 - Yet to Implement/Backend - Telemetry - Leader Election.md",
-    "13 - Yet to Implement/Backend - Telemetry - Parallel Batch Users.md",
-    "13 - Yet to Implement/Backend - Telemetry - Retention Policy.md",
-    "13 - Yet to Implement/Backend - Telemetry - Snapshot Encryption.md",
-    "13 - Yet to Implement/Backend - Telemetry - Idempotency Key.md",
-    "13 - Yet to Implement/Backend - Telemetry - DLQ.md",
-    "13 - Yet to Implement/Backend - Auth - Behavioral Limits.md",
-    "13 - Yet to Implement/Backend - Auth - Promote User Endpoint.md",
-    "13 - Yet to Implement/Backend - Auth - Username Cross-Collection Uniqueness.md",
-    "13 - Yet to Implement/Backend - Auth - Unlock Endpoint.md",
-    "13 - Yet to Implement/Backend - Auth - Project Analysis Status.md",
-    "13 - Yet to Implement/Backend - Auth - Saga for Registration.md",
-    "13 - Yet to Implement/Backend - Auth - MFA.md",
-    "13 - Yet to Implement/Backend - Auth - Bcrypt Cost.md",
-    "13 - Yet to Implement/Compliance - GDPR Data Export.md",
-    "13 - Yet to Implement/Compliance - GDPR Right to Erase.md",
-    "13 - Yet to Implement/Backend - Fusion - Real ML Pipeline.md",
-    "13 - Yet to Implement/Backend - THG - Demo Endpoint Gate.md",
-    "13 - Yet to Implement/Backend - THG - Demo Endpoint Gate.md.tmp.16608.b2769e193791",
-    "13 - Yet to Implement/Backend - Auth - Data Explorer Hardening.md",
-    "13 - Yet to Implement/Backend - Fusion - SSRF Guard.md",
-    "13 - Yet to Implement/Backend - Fusion - SSRF Guard.md.tmp.16608.45515453115a",
-    "13 - Yet to Implement/Backend - Gateway - Rate Limiting.md",
-    "13 - Yet to Implement/Backend - All - Service-to-Service Auth.md",
-    "13 - Yet to Implement/Backend - Telemetry - Server-Side Secret Scan.md",
-    "13 - Yet to Implement/Backend - Telemetry - Server-Side Secret Scan.md.tmp.16608.c144d6d5c5d0",
-    "13 - Yet to Implement/Backend - Telemetry - Snippet Envelope Encryption.md",
-    "13 - Yet to Implement/Backend - Telemetry - Snippet Envelope Encryption.md.tmp.16608.5b9e74c573f0",
-    "13 - Yet to Implement/Backend - Telemetry - Snapshot Storage.md",
-    "13 - Yet to Implement/P0 - Critical Blockers.md.tmp.16608.e1e324de88ac",
-    "13 - Yet to Implement/README - For Agents.md.tmp.16608.9d38da6057f6",
-    "13 - Yet to Implement",
-    "07 - Algorithms/Anomaly Detection.md.tmp.39916.984fc8884576",
-    "07 - Algorithms/Async-Redis-WS.md.tmp.39916.68833b4f6ffa",
-    "07 - Algorithms/BGSC Feedback.md.tmp.39916.9d78d3020afe"
+    "DCT/13 - Yet to Implement/Backend - THG - Demo Endpoint Gate.md",
+    "DCT/13 - Yet to Implement/Backend - Auth - Data Explorer Hardening.md",
+    "DCT/13 - Yet to Implement/Backend - Fusion - SSRF Guard.md",
+    "DCT/13 - Yet to Implement/Backend - Gateway - Rate Limiting.md",
+    "DCT/13 - Yet to Implement/Backend - All - Service-to-Service Auth.md",
+    "DCT/13 - Yet to Implement/Backend - Telemetry - Server-Side Secret Scan.md",
+    "DCT/13 - Yet to Implement/Backend - Telemetry - Server-Side Secret Scan.md.tmp.16608.c144d6d5c5d0",
+    "DCT/13 - Yet to Implement/Backend - Telemetry - Snippet Envelope Encryption.md",
+    "DCT/13 - Yet to Implement/Backend - Telemetry - Snippet Envelope Encryption.md.tmp.16608.5b9e74c573f0",
+    "DCT/13 - Yet to Implement/Backend - Telemetry - Snapshot Storage.md",
+    "DCT/13 - Yet to Implement/Extension - Secret Filter.md",
+    "DCT/13 - Yet to Implement/Backend - Auth - Refresh Tokens.md",
+    "DCT/13 - Yet to Implement/Backend - Auth - JWT + Sessions.md",
+    "DCT/13 - Yet to Implement/Backend - All - RBAC Signed.md",
+    "DCT/13 - Yet to Implement/Done.md",
+    "DCT/13 - Yet to Implement/P2 - Hardening & Polish.md",
+    "DCT/13 - Yet to Implement/P1 - Production Readiness.md",
+    "DCT/13 - Yet to Implement/P0 - Critical Blockers.md",
+    "DCT/13 - Yet to Implement/README - For Agents.md"
   ]
 }
