@@ -5,13 +5,21 @@ import { TelemetryCollector } from './collector';
 import { TelemetryBuffer, BufferedPayload } from './buffer';
 import { createWorkspaceSnapshot } from './snapshotter';
 
+interface RuntimeConfig {
+    intervalSeconds: number;
+    isPaused: boolean;
+    handshakeIntervalMs: number;
+}
+
 export class TelemetrySender {
     private timeout: ReturnType<typeof setTimeout> | undefined;
+    private handshakeTimer: ReturnType<typeof setInterval> | undefined;
     private collector: TelemetryCollector;
     private buffer: TelemetryBuffer;
     private isFirstTick = true;
-    // Hot heartbeat reload: tracks the last known interval so we can detect changes
     private lastIntervalSeconds = 30;
+    private lastHandshakeIntervalMs = 5000;
+    private isPaused = false;
 
     constructor(private readonly context: vscode.ExtensionContext) {
         this.collector = new TelemetryCollector();
@@ -31,15 +39,23 @@ export class TelemetrySender {
         };
     }
 
-    private async fetchIntervalSeconds(): Promise<number> {
+    private async fetchRuntimeConfig(): Promise<RuntimeConfig> {
         try {
             const resp = await axios.get(
                 `${this.gatewayUrl()}/api/v1/monitoring/system-config`,
                 { timeout: 3000 }
             );
-            return Number(resp.data?.heartbeat_interval_seconds) || 30;
+            return {
+                intervalSeconds:    Number(resp.data?.heartbeat_interval_seconds) || 30,
+                isPaused:           Boolean(resp.data?.is_monitoring_paused),
+                handshakeIntervalMs: Number(resp.data?.shec_handshake_interval_ms) || 5000,
+            };
         } catch {
-            return this.lastIntervalSeconds; // retain last good value
+            return {
+                intervalSeconds:    this.lastIntervalSeconds,
+                isPaused:           this.isPaused,
+                handshakeIntervalMs: this.lastHandshakeIntervalMs,
+            };
         }
     }
 
@@ -63,34 +79,13 @@ export class TelemetrySender {
             return;
         }
 
-        const { vscodeMachineId, nativeHwid } = this.getMachineIds();
-        const lastHash = this.context.globalState.get<string>('adt.lastStateHash') || 'INIT';
-
-        try {
-            const handshake = await axios.post(
-                `${this.gatewayUrl()}/api/v1/telemetry/telemetry/handshake`,
-                null,
-                {
-                    params: {
-                        extension_id: extensionId,
-                        current_hash: lastHash,
-                        machine_id: vscodeMachineId,
-                        native_hwid: nativeHwid,
-                    },
-                }
-            );
-            if (handshake.data.status === 'mismatch') {
-                vscode.window.showWarningMessage('ADT: State mismatch detected — backfilling missed diffs…');
-            }
-        } catch {
-            vscode.window.showWarningMessage('ADT: SHEC handshake failed — proceeding with standard telemetry.');
-        }
+        await this.runHandshake();
 
         vscode.window.showWarningMessage('ADT: Monitoring active — SHEC continuous sync started.');
         this.isFirstTick = true;
+        this.resetHandshakeTimer(this.lastHandshakeIntervalMs);
         this.scheduleNext();
 
-        // Replay any buffered payloads from a previous offline period
         if (!this.buffer.isEmpty()) {
             vscode.window.showWarningMessage(`ADT: Replaying ${this.buffer.size} buffered event(s) from offline period…`);
             await this.buffer.replay(p => this.postPayload(p));
@@ -98,9 +93,32 @@ export class TelemetrySender {
     }
 
     public stop() {
-        if (this.timeout) {
-            clearTimeout(this.timeout);
-            this.timeout = undefined;
+        if (this.timeout) { clearTimeout(this.timeout); this.timeout = undefined; }
+        if (this.handshakeTimer) { clearInterval(this.handshakeTimer); this.handshakeTimer = undefined; }
+    }
+
+    // ── SHEC periodic re-handshake ────────────────────────────────────────────
+
+    private resetHandshakeTimer(intervalMs: number) {
+        if (this.handshakeTimer) clearInterval(this.handshakeTimer);
+        this.handshakeTimer = setInterval(() => this.runHandshake(), intervalMs);
+    }
+
+    private async runHandshake() {
+        const extensionId = await this.context.secrets.get('adt.extensionId');
+        if (!extensionId) return;
+        const { vscodeMachineId, nativeHwid } = this.getMachineIds();
+        const lastHash = this.context.globalState.get<string>('adt.lastStateHash') || 'INIT';
+        try {
+            const resp = await axios.post(
+                `${this.gatewayUrl()}/api/v1/telemetry/telemetry/handshake`, null,
+                { params: { extension_id: extensionId, current_hash: lastHash, machine_id: vscodeMachineId, native_hwid: nativeHwid } }
+            );
+            if (resp.data.status === 'mismatch') {
+                vscode.window.showWarningMessage('ADT: State mismatch detected — backfilling missed diffs…');
+            }
+        } catch {
+            // silent — network may be briefly unavailable
         }
     }
 
@@ -131,22 +149,38 @@ export class TelemetrySender {
     // ── Core tick loop ────────────────────────────────────────────────────────
 
     private scheduleNext() {
-        this.fetchIntervalSeconds().then(secs => {
-            // Hot heartbeat reload: log if interval changed
-            if (secs !== this.lastIntervalSeconds) {
+        this.fetchRuntimeConfig().then(cfg => {
+            const { intervalSeconds, isPaused, handshakeIntervalMs } = cfg;
+
+            if (intervalSeconds !== this.lastIntervalSeconds) {
                 vscode.window.showWarningMessage(
-                    `ADT: Heartbeat interval updated ${this.lastIntervalSeconds}s → ${secs}s`
+                    `ADT: Heartbeat interval updated ${this.lastIntervalSeconds}s → ${intervalSeconds}s`
                 );
-                this.lastIntervalSeconds = secs;
+                this.lastIntervalSeconds = intervalSeconds;
             }
-            this.timeout = setTimeout(() => this.tickAndReschedule(), secs * 1000);
+
+            if (isPaused && !this.isPaused) {
+                vscode.window.showWarningMessage('ADT: Monitoring paused by administrator.');
+            } else if (!isPaused && this.isPaused) {
+                vscode.window.showWarningMessage('ADT: Monitoring resumed.');
+            }
+            this.isPaused = isPaused;
+
+            if (handshakeIntervalMs !== this.lastHandshakeIntervalMs) {
+                this.lastHandshakeIntervalMs = handshakeIntervalMs;
+                this.resetHandshakeTimer(handshakeIntervalMs);
+            }
+
+            this.timeout = setTimeout(() => this.tickAndReschedule(), intervalSeconds * 1000);
         }).catch(() => {
             this.timeout = setTimeout(() => this.tickAndReschedule(), this.lastIntervalSeconds * 1000);
         });
     }
 
     private async tickAndReschedule() {
-        await this.sendHeartbeat();
+        if (!this.isPaused) {
+            await this.sendHeartbeat();
+        }
         this.scheduleNext();
     }
 

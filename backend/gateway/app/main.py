@@ -1,6 +1,9 @@
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 import httpx
+import ipaddress
+import time
 import os
 import logging
 import sys
@@ -15,6 +18,62 @@ logging.basicConfig(
 logger = logging.getLogger("gateway-service")
 
 app = FastAPI(title="ADT API Gateway", version="1.0.0")
+
+# ── Office Network Whitelist Middleware ───────────────────────────────────────
+# Only telemetry ingest requires the device to be on an office network.
+WHITELIST_GUARDED_PATHS = {"/api/v1/telemetry/telemetry/ingest"}
+
+class IPWhitelistMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, monitoring_url: str):
+        super().__init__(app)
+        self.monitoring_url = monitoring_url
+        self._whitelist: list[str] = ["127.0.0.1", "::1", "10.0.0.0/8"]
+        self._last_refresh: float = 0.0
+
+    async def _refresh_whitelist(self):
+        if time.monotonic() - self._last_refresh < 300:   # 5-min cache
+            return
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                resp = await client.get(f"{self.monitoring_url}/api/v1/monitoring/system-config")
+                if resp.status_code == 200:
+                    wl = resp.json().get("office_network_whitelist")
+                    if isinstance(wl, list) and wl:
+                        self._whitelist = wl
+                        self._last_refresh = time.monotonic()
+        except Exception:
+            pass  # keep last known whitelist on error
+
+    def _is_allowed(self, ip: str) -> bool:
+        try:
+            addr = ipaddress.ip_address(ip)
+            for entry in self._whitelist:
+                try:
+                    if addr in ipaddress.ip_network(entry, strict=False):
+                        return True
+                except ValueError:
+                    if ip == entry:
+                        return True
+        except ValueError:
+            pass
+        return False
+
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path in WHITELIST_GUARDED_PATHS:
+            await self._refresh_whitelist()
+            # Honour X-Forwarded-For when behind a reverse proxy
+            forwarded = request.headers.get("x-forwarded-for")
+            client_ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "")
+            if not self._is_allowed(client_ip):
+                logger.warning(f"[GATEWAY] IP BLOCKED: {client_ip} not in office whitelist")
+                return Response(
+                    content='{"detail": "Access denied: not on authorised network"}',
+                    status_code=403,
+                    media_type="application/json",
+                )
+        return await call_next(request)
+
+app.add_middleware(IPWhitelistMiddleware, monitoring_url=os.getenv("MONITORING_URL", "http://monitoring-service:8000"))
 
 # Secure CORS configuration
 default_cors = "http://localhost,http://localhost:80,http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:5173"

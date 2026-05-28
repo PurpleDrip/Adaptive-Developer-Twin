@@ -80,7 +80,7 @@ export const SuccessStep: React.FC<SuccessStepProps> = ({ ids }) => {
                             </div>
                         </div>
 
-                        <a href="/downloads/adt-extension.vsix" className="btn-large mb-4 w-full flex items-center justify-center gap-2 group cursor-pointer">
+                        <a href="/api/download-extension" className="btn-large mb-4 w-full flex items-center justify-center gap-2 group cursor-pointer">
                             <Download size={18} className="group-hover:translate-y-0.5 transition-transform" /> Download Extension
                         </a>
                         

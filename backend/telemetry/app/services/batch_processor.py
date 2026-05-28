@@ -26,25 +26,31 @@ class BatchProcessor:
         )
         self.scheduler.start()
 
-    async def _fetch_and_apply_config(self):
-        """Fetches system config and reschedules the job if interval changed."""
+    async def _fetch_and_apply_config(self) -> bool:
+        """Fetches system config, reschedules if interval changed. Returns False if monitoring is paused."""
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resp = await client.get(f"{self.monitoring_url}/api/v1/monitoring/system-config")
                 if resp.status_code == 200:
-                    new_interval = int(resp.json().get("batch_interval_minutes", self.batch_interval))
+                    data = resp.json()
+                    new_interval = int(data.get("batch_interval_minutes", self.batch_interval))
                     if new_interval != self.batch_interval:
                         self.batch_interval = new_interval
                         job = self.scheduler.get_job('batch_processor')
                         if job:
                             job.reschedule(trigger='interval', minutes=new_interval)
                             logger.info(f"[BATCH] Interval rescheduled to {new_interval} min from system config")
+                    if data.get("is_monitoring_paused"):
+                        logger.info("[BATCH] Monitoring is paused by administrator — skipping batch run.")
+                        return False
         except Exception as e:
             logger.warning(f"[BATCH] Could not fetch system config: {e}")
+        return True
 
     async def process_batches(self):
         """Main batch processing loop."""
-        await self._fetch_and_apply_config()
+        if not await self._fetch_and_apply_config():
+            return
         logger.info("Starting micro-batch telemetry processing...")
 
         logger.info("Starting batch telemetry processing...")

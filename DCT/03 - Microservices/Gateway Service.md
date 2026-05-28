@@ -22,6 +22,7 @@ aliases: [Gateway]
 - **Reverse proxy** to all 8 microservices.
 - **Timeout normalization** — 30 s upstream cap → `504 Gateway Timeout`.
 - **Error code mapping** — upstream `RequestError` → 502.
+- **Office network whitelist** — blocks telemetry ingest from IPs outside configured CIDR ranges (see below).
 
 Explicitly **not** responsible for: auth, rate limiting (yet), caching, request shaping.
 
@@ -43,6 +44,7 @@ None — the gateway is body-agnostic. It forwards `bytes` upstream.
 - **httpx.AsyncClient** singleton — created on startup, closed on shutdown, 30 s timeout.
 - **Logging** — every request with status `≥ 400` logged at ERROR, else INFO.
 - **Header passthrough** — strips `host`, preserves all others (including `X-User-Role` used by RBAC dependencies downstream).
+- **`IPWhitelistMiddleware`** — `starlette.middleware.base.BaseHTTPMiddleware` applied only to `POST /api/v1/telemetry/telemetry/ingest`. Fetches `office_network_whitelist` from monitoring service (5-min cache TTL). Checks client IP (and `X-Forwarded-For`) against CIDR entries; returns `403` if not matched. Default whitelist: `["127.0.0.1", "::1", "10.0.0.0/8"]`.
 
 ## Database
 
@@ -76,6 +78,7 @@ None.
 - **No auth enforcement** — JWT/session check should happen here as defense in depth. ([[13 - Yet to Implement/Backend - Gateway - JWT Verification Edge]])
 - **No request size cap** — large workspace snapshots can DoS. ([[13 - Yet to Implement/Backend - Gateway - Body Size Limits]])
 - **No tracing** — should inject `X-Request-ID` if absent. ([[13 - Yet to Implement/Backend - All - Structured Logs + TraceID]])
+- **IP whitelist only covers telemetry ingest** — other guarded paths (e.g. deep-audit, project analysis) are not yet enforced.
 
 ## Hot path
 

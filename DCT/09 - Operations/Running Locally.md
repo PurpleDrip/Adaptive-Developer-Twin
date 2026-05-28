@@ -85,3 +85,6 @@ You should see `status: "healthy"` and every service reporting `ok`.
 | Gateway returns 502 | One of the upstreams is down — check `/system-health` |
 | Extension can't connect | Check `adt.gatewayUrl` in VS Code settings + `CORS_ORIGINS` in `.env` |
 | Fusion 6 s cold start | Expected — CodeBERT model load. Warm-up planned ([[13 - Yet to Implement/Backend - Fusion - Model Warm-up]]) |
+| `ModuleNotFoundError: No module named 'app'` | Run `./scripts/run_backend.ps1` from **any directory** — script uses `$PSScriptRoot` to resolve paths. If services still fail, check that `.env` is in the project root (not `scripts/`). |
+| Services connect to `localhost:27017` instead of Atlas | `.env` env vars were not propagated. Fixed in `run_backend.ps1` — each `Start-Job` now explicitly applies all `.env` key/value pairs before starting uvicorn. |
+| Telemetry ingest returns `403 Access denied: not on authorised network` | Your machine IP is not in `office_network_whitelist` in system config. Add your IP/subnet via `PUT /api/v1/monitoring/system-config`. Default allows `127.0.0.1` and `10.0.0.0/8`. |

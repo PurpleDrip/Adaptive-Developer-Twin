@@ -51,9 +51,12 @@ def _build_fusion_result(user_id: str, data: FusionInputDTO) -> Dict[str, Any]:
     telemetry_summary = data.telemetry_summary
     batch_res = detector.analyze_batch([telemetry_summary] * 5)
     
-    # 2. Human Verification (Typing Jitter analysis)
-    wpm_val = telemetry_summary.get("avg_wpm", telemetry_summary.get("wpm", 0.0))
-    jitter_res = detector.check_human_jitter([wpm_val] * 5)
+    # 2. Human Verification (Typing Jitter analysis) — use real wpm_values if available
+    wpm_values = telemetry_summary.get("wpm_values") or []
+    if len(wpm_values) < 3:
+        fallback = telemetry_summary.get("avg_wpm", telemetry_summary.get("wpm", 0.0))
+        wpm_values = [fallback] * 3 if fallback > 0 else []
+    jitter_res = detector.check_human_jitter(wpm_values)
     
     # 3. Composite Reliability (0.0 - 1.0)
     reliability = detector.compute_composite_reliability(batch_res, jitter_res)
@@ -88,8 +91,11 @@ def _build_fusion_result(user_id: str, data: FusionInputDTO) -> Dict[str, Any]:
 
     fused_results = WeightEngine.fuse_all_skills(all_evidence)
 
+    # reliability is a float from compute_composite_reliability()
+    reliability_score = float(reliability)
+    is_reliable = reliability_score >= 0.8
+
     final_updates = {}
-    reliability_score = float(reliability.get("reliability_score", 1.0))
     for skill, res in fused_results.items():
         res["confidence"] = BayesianFuser.calculate_posterior_confidence(
             prior_strength=res["strength"],
@@ -99,7 +105,7 @@ def _build_fusion_result(user_id: str, data: FusionInputDTO) -> Dict[str, Any]:
         )
         res["confidence"] = round(res["confidence"] * reliability_score, 4)
         res["explanation"] = SHAPExplainer.explain_score(skill, res["sources"])
-        if not reliability.get("is_reliable", True):
+        if not is_reliable:
             res["fraud_flag"] = "ANOMALY_DETECTED"
         final_updates[skill] = res
 
@@ -107,7 +113,7 @@ def _build_fusion_result(user_id: str, data: FusionInputDTO) -> Dict[str, Any]:
         "status": "fusion_complete",
         "user_id": data.user_id or user_id,
         "engine_version": "v2.0-top-tier",
-        "reliability_check": reliability,
+        "reliability_check": {"reliability_score": reliability_score, "is_reliable": is_reliable},
         "skill_updates": final_updates
     }
 

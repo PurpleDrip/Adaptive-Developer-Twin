@@ -82,15 +82,19 @@ export default function DeveloperDashboard() {
                     setNotifications(safeArray(notifResp.data));
                 } catch { setNotifications([]); }
 
+                let selfCompositeScore = 0;
+                let selfRank = 0;
                 try {
                     const statsResp = await analyticsApi.getSummary(userId);
                     const s = safeObject(statsResp.data);
                     if (s?.wpm !== undefined) {
+                        selfRank = s.overall_rank ?? 0;
                         setMetrics({
                             wpm: s.wpm, active_hours: s.active_hours, lines: s.lines,
-                            rank: s.overall_rank, percentile: s.overall_rank_percentile,
+                            rank: selfRank, percentile: s.overall_rank_percentile,
                             velocity: s.learning_velocity, top_skill: s.top_skills?.[0] || 'Backend'
                         });
+                        selfCompositeScore = (s.overall_rank_percentile ?? 0) / 100;
                     }
                 } catch { console.warn('Analytics not available'); }
 
@@ -106,7 +110,28 @@ export default function DeveloperDashboard() {
 
                 try {
                     const lbResp = await analyticsApi.getLeaderboard('Python');
-                    setLeaderboard(safeArray(lbResp.data));
+                    const lb: any[] = safeArray(lbResp.data);
+                    const top10 = lb.slice(0, 10);
+
+                    const selfIdx = top10.findIndex((e: any) => e.dev_id === userId);
+                    if (selfIdx !== -1) {
+                        // In top 10 — tag in place, rank is their position
+                        top10[selfIdx] = { ...top10[selfIdx], isSelf: true };
+                        setLeaderboard(top10);
+                    } else {
+                        // Not in top 10 — find rank from full list or fall back to analytics rank
+                        const fullIdx = lb.findIndex((e: any) => e.dev_id === userId);
+                        const actualRank = fullIdx !== -1 ? fullIdx + 1 : (selfRank > 0 ? selfRank : null);
+                        const selfEntry = {
+                            dev_id: userId,
+                            name: session.name,
+                            composite_score: selfCompositeScore,
+                            isSelf: true,
+                            isSelfBelow: true,  // render below separator
+                            rank: actualRank,
+                        };
+                        setLeaderboard([...top10, selfEntry]);
+                    }
                 } catch { console.warn('Leaderboard not available'); }
 
                 try {
@@ -271,21 +296,43 @@ export default function DeveloperDashboard() {
                         </h3>
                         <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1 custom-scrollbar">
                             {leaderboard.length > 0 ? leaderboard.map((entry, idx) => (
-                                <div key={entry.dev_id} className={`flex items-center gap-3 p-2.5 rounded-xl border ${
-                                    entry.dev_id === user?.user_id
-                                        ? 'bg-blue-500/10 border-blue-500/30'
-                                        : 'bg-black/30 border-zinc-900'
-                                } hover:border-zinc-700 transition-all`}>
-                                    <span className={`w-5 text-xs font-bold ${idx < 3 ? 'text-yellow-500' : 'text-zinc-600'}`}>
-                                        {idx + 1}
-                                    </span>
-                                    <div className="w-6 h-6 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
-                                        {entry.name?.[0]}
+                                <div key={entry.dev_id}>
+                                    {entry.isSelfBelow && (
+                                        <div className="flex items-center gap-2 py-2">
+                                            <div className="flex-1 border-t border-dashed border-zinc-800" />
+                                            <span className="text-[10px] text-zinc-600 shrink-0">your position</span>
+                                            <div className="flex-1 border-t border-dashed border-zinc-800" />
+                                        </div>
+                                    )}
+                                    <div className={`flex items-center gap-3 p-2.5 rounded-xl border ${
+                                        entry.isSelf
+                                            ? 'bg-blue-500/10 border-blue-500/30'
+                                            : 'bg-black/30 border-zinc-900'
+                                    } hover:border-zinc-700 transition-all`}>
+                                        <span className={`w-6 text-xs font-bold shrink-0 ${
+                                            entry.isSelfBelow
+                                                ? 'text-blue-400'
+                                                : idx < 3 ? 'text-yellow-500' : 'text-zinc-600'
+                                        }`}>
+                                            {entry.isSelfBelow
+                                                ? (entry.rank ? `#${entry.rank}` : '—')
+                                                : idx + 1}
+                                        </span>
+                                        <div className={`w-6 h-6 rounded-full border flex items-center justify-center text-[9px] font-bold shrink-0 ${
+                                            entry.isSelf ? 'bg-blue-600 border-blue-400' : 'bg-zinc-800 border-zinc-700'
+                                        }`}>
+                                            {entry.name?.[0]}
+                                        </div>
+                                        <p className="text-xs font-medium text-white truncate flex-1">{entry.name}</p>
+                                        {entry.isSelf && (
+                                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/40 text-blue-400 shrink-0">
+                                                YOU
+                                            </span>
+                                        )}
+                                        <span className="text-xs font-mono text-blue-500 shrink-0">
+                                            {((entry.composite_score ?? entry.strength ?? 0) * 100).toFixed(0)}%
+                                        </span>
                                     </div>
-                                    <p className="text-xs font-medium text-white truncate flex-1">{entry.name}</p>
-                                    <span className="text-xs font-mono text-blue-500 flex-shrink-0">
-                                        {((entry.composite_score ?? entry.strength ?? 0) * 100).toFixed(0)}%
-                                    </span>
                                 </div>
                             )) : (
                                 <p className="text-xs text-zinc-600 italic text-center py-8">No leaderboard data yet</p>
@@ -351,14 +398,14 @@ export default function DeveloperDashboard() {
                                     <div key={notif.notification_id} className={`p-3 rounded-xl border ${
                                         notif.is_read ? 'bg-black/20 border-zinc-900' : 'bg-blue-500/5 border-blue-500/20'
                                     } flex items-start gap-3`}>
-                                        <div className={`mt-0.5 flex-shrink-0 ${notif.type === 'task_allotted' ? 'text-blue-500' : 'text-green-500'}`}>
+                                        <div className={`mt-0.5 shrink-0 ${notif.type === 'task_allotted' ? 'text-blue-500' : 'text-green-500'}`}>
                                             {notif.type === 'task_allotted' ? <Briefcase size={13} /> : <CheckCircle size={13} />}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <h4 className="text-xs font-semibold text-white">{notif.title}</h4>
                                             <p className="text-[11px] text-zinc-500 mt-0.5">{notif.message}</p>
                                         </div>
-                                        {!notif.is_read && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />}
+                                        {!notif.is_read && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0" />}
                                     </div>
                                 )) : (
                                     <div className="py-10 text-center text-zinc-700 text-xs italic">
@@ -404,12 +451,12 @@ export default function DeveloperDashboard() {
                                                 {score === undefined ? (
                                                     <button
                                                         onClick={() => { setTakingTest(test); setTestAnswers({}); }}
-                                                        className="ml-4 flex items-center gap-1.5 px-3 py-2 bg-purple-600/20 border border-purple-500/30 text-purple-400 hover:bg-purple-600 hover:text-white hover:border-purple-500 transition-all rounded-lg text-xs font-medium flex-shrink-0"
+                                                        className="ml-4 flex items-center gap-1.5 px-3 py-2 bg-purple-600/20 border border-purple-500/30 text-purple-400 hover:bg-purple-600 hover:text-white hover:border-purple-500 transition-all rounded-lg text-xs font-medium shrink-0"
                                                     >
                                                         Take Test <ChevronRight size={12} />
                                                     </button>
                                                 ) : (
-                                                    <span className="ml-4 text-[10px] text-zinc-600 italic flex-shrink-0">Completed</span>
+                                                    <span className="ml-4 text-[10px] text-zinc-600 italic shrink-0">Completed</span>
                                                 )}
                                             </div>
                                         </div>
@@ -436,14 +483,14 @@ export default function DeveloperDashboard() {
                 <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
                     <div className="glass-card w-full max-w-2xl max-h-[90vh] flex flex-col border-zinc-700">
 
-                        <div className="p-6 border-b border-zinc-800 flex justify-between items-start flex-shrink-0">
+                        <div className="p-6 border-b border-zinc-800 flex justify-between items-start shrink-0">
                             <div>
                                 <h3 className="text-lg font-bold text-white">{takingTest.title}</h3>
                                 <p className="text-xs text-zinc-500 mt-1">
                                     Domain: {takingTest.domain} · {takingTest.questions?.length} questions · One attempt only
                                 </p>
                             </div>
-                            <button onClick={() => setTakingTest(null)} className="text-zinc-500 hover:text-white transition-colors ml-4 flex-shrink-0">
+                            <button onClick={() => setTakingTest(null)} className="text-zinc-500 hover:text-white transition-colors ml-4 shrink-0">
                                 <X size={20} />
                             </button>
                         </div>
@@ -478,7 +525,7 @@ export default function DeveloperDashboard() {
                             ))}
                         </div>
 
-                        <div className="p-6 border-t border-zinc-800 flex-shrink-0">
+                        <div className="p-6 border-t border-zinc-800 shrink-0">
                             <div className="flex items-center justify-between mb-3">
                                 <p className="text-xs text-zinc-500">
                                     {Object.keys(testAnswers).length} / {takingTest.questions?.length} answered

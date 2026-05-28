@@ -51,6 +51,7 @@ tags: [frontend, ux]
 - Final step of `/register`
 - Displays the freshly issued `extension_id` (one-time)
 - Copy button + "Download QR" (for mobile install)
+- **Download Extension** button → `GET /api/download-extension` (Next.js API route that always serves the latest `.vsix` from `releases/` by modification time)
 - "Open VS Code & paste" CTA
 
 ## `registration/ValidationIcon.tsx`
