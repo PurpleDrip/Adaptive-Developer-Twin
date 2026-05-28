@@ -1,25 +1,73 @@
 import sys
 import os
 
+# Structure: backend/<service>/test/unit/test_X.py
+#   service root = 2 dirs up   (backend/<service>)
+#   project root = 4 dirs up   (ADT-v1/)
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
-_SERVICE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+_SERVICE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 for p in (_PROJECT_ROOT, _SERVICE_ROOT):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+import contextlib
+import importlib
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-import importlib
 
 pytestmark = pytest.mark.unit
+
+_ALL_SERVICE_ROOTS = [
+    os.path.abspath(os.path.join(_PROJECT_ROOT, 'backend', svc))
+    for svc in ['auth', 'telemetry', 'thg', 'monitoring', 'task',
+                'fusion', 'allocation', 'analytics', 'gateway']
+]
+
+
+@contextlib.contextmanager
+def _service_path_priority(service_root: str):
+    """Temporarily prioritize service_root and exclude all other service roots."""
+    saved_entries = [p for p in sys.path if p in _ALL_SERVICE_ROOTS]
+    clean_path = [p for p in sys.path if p not in _ALL_SERVICE_ROOTS]
+    sys.path[:] = [service_root] + clean_path
+
+    for k in list(sys.modules.keys()):
+        if k.startswith("app.") or k == "app":
+            del sys.modules[k]
+    importlib.invalidate_caches()
+
+    try:
+        yield
+    finally:
+        sys.path[:] = clean_path
+        for p in saved_entries:
+            if p not in sys.path:
+                sys.path.append(p)
+        for k in list(sys.modules.keys()):
+            if k.startswith("app.") or k == "app":
+                del sys.modules[k]
+        importlib.invalidate_caches()
 
 
 def _reimport_batch_processor():
     """Force a fresh import of batch_processor so env patching takes effect."""
+    # Ensure only telemetry service root is active before reimport
+    saved = [p for p in sys.path if p in _ALL_SERVICE_ROOTS]
+    clean = [p for p in sys.path if p not in _ALL_SERVICE_ROOTS]
+    sys.path[:] = [_SERVICE_ROOT] + clean
+    importlib.invalidate_caches()
+
     for mod_name in list(sys.modules.keys()):
-        if 'batch_processor' in mod_name:
+        if 'batch_processor' in mod_name or (mod_name.startswith("app.") or mod_name == "app"):
             del sys.modules[mod_name]
+
     import app.services.batch_processor as bpm
+
+    # Restore paths
+    sys.path[:] = clean
+    for p in saved:
+        if p not in sys.path:
+            sys.path.append(p)
     return bpm
 
 

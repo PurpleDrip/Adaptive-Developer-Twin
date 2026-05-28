@@ -13,7 +13,6 @@ for p in (_PROJECT_ROOT, _SERVICE_ROOT):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-# All known service roots — used to isolate imports between services.
 _ALL_SERVICE_ROOTS = [
     os.path.abspath(os.path.join(_PROJECT_ROOT, 'backend', svc))
     for svc in ['auth', 'telemetry', 'thg', 'monitoring', 'task',
@@ -25,6 +24,14 @@ from httpx import AsyncClient, ASGITransport
 from unittest.mock import AsyncMock, MagicMock, patch
 
 pytestmark = pytest.mark.integration
+
+MOCK_CONFIG = {
+    "batch_interval_minutes": 5,
+    "heartbeat_interval_seconds": 30,
+    "is_monitoring_paused": False,
+    "office_network_whitelist": ["127.0.0.1"],
+    "shec_handshake_interval_ms": 5000,
+}
 
 
 @contextlib.contextmanager
@@ -52,25 +59,24 @@ def _service_path_priority(service_root: str):
         importlib.invalidate_caches()
 
 
-def _make_mock_col():
-    col = MagicMock()
-    col.find_one = AsyncMock(return_value=None)
-    col.insert_one = AsyncMock(return_value=MagicMock(inserted_id="mock-id"))
-    col.update_one = AsyncMock(return_value=None)
-    return col
-
-
 @pytest.fixture
-async def auth_app():
-    mock_redis = MagicMock()
-    mock_redis.setex = MagicMock()
-    mock_redis.get = MagicMock(return_value=None)
-    mock_redis.publish = MagicMock()
+async def monitoring_app():
+    mock_col = MagicMock()
+    mock_col.find_one = AsyncMock(return_value=MOCK_CONFIG)
+    mock_col.update_one = AsyncMock(return_value=None)
 
-    mock_col = _make_mock_col()
+    mock_audit_cursor = MagicMock()
+    mock_audit_cursor.__aiter__ = MagicMock(return_value=iter([]))
+    mock_col.find = MagicMock(return_value=mock_audit_cursor)
+
+    mock_redis = MagicMock()
+    mock_pubsub = AsyncMock()
+    mock_pubsub.__aenter__ = AsyncMock(return_value=mock_pubsub)
+    mock_pubsub.__aexit__ = AsyncMock(return_value=None)
+    mock_redis.pubsub = MagicMock(return_value=mock_pubsub)
 
     with _service_path_priority(_SERVICE_ROOT):
-        with patch("redis.from_url", return_value=mock_redis), \
+        with patch("redis.asyncio.from_url", return_value=mock_redis), \
              patch("shared.database.mongo.connect_mongo", AsyncMock()), \
              patch("shared.database.mongo.close_mongo", AsyncMock()), \
              patch("shared.database.mongo.get_collection", return_value=mock_col):
@@ -79,60 +85,26 @@ async def auth_app():
 
 
 @pytest.fixture
-async def client(auth_app):
+async def client(monitoring_app):
     async with AsyncClient(
-        transport=ASGITransport(app=auth_app), base_url="http://test"
+        transport=ASGITransport(app=monitoring_app), base_url="http://test"
     ) as c:
         yield c
 
 
-class TestAuthHealthRoute:
+class TestMonitoringRoutes:
     async def test_health_returns_200(self, client):
-        resp = await client.get("/api/v1/auth/health")
+        resp = await client.get("/api/v1/monitoring/health")
         assert resp.status_code == 200
         assert resp.json()["status"] == "healthy"
 
+    async def test_system_config_returns_200(self, client):
+        resp = await client.get("/api/v1/monitoring/system-config")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "batch_interval_minutes" in data
 
-class TestLoginRoute:
-    async def test_login_unknown_user_returns_401(self, client):
-        resp = await client.post(
-            "/api/v1/auth/users/login",
-            json={"username": "ghost", "password": "wrong"},
-        )
-        assert resp.status_code == 401
-
-    async def test_login_missing_fields_returns_422(self, client):
-        resp = await client.post(
-            "/api/v1/auth/users/login", json={"username": "alice"}
-        )
-        assert resp.status_code == 422
-
-
-class TestRegisterRoute:
-    VALID_PAYLOAD = {
-        "name": "Test Dev",
-        "username": "testdev_unique",
-        "email": "testdev@example.com",
-        "phone_number": "1234567890",
-        "gender": "Male",
-        "experience_level": "Mid",
-        "password": "SecurePass123!",
-        "strong_domains": ["backend"],
-        "github_project_urls": [],
-    }
-
-    async def test_register_returns_201_and_extension_id(self, client):
-        resp = await client.post(
-            "/api/v1/auth/users/register", json=self.VALID_PAYLOAD
-        )
-        assert resp.status_code == 201
-        body = resp.json()
-        assert "extension_id" in body
-        assert body["extension_id"].startswith("ADT-")
-        assert "user_id" in body
-
-    async def test_register_missing_name_returns_422(self, client):
-        data = {**self.VALID_PAYLOAD}
-        del data["name"]
-        resp = await client.post("/api/v1/auth/users/register", json=data)
-        assert resp.status_code == 422
+    async def test_audit_log_returns_list(self, client):
+        resp = await client.get("/api/v1/monitoring/audit-log")
+        assert resp.status_code == 200
+        assert isinstance(resp.json(), list)

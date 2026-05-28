@@ -52,54 +52,39 @@ def _service_path_priority(service_root: str):
 
 
 @pytest.fixture
-async def telemetry_app():
+async def task_app():
     mock_col = MagicMock()
-    mock_col.find_one = AsyncMock(return_value={
-        "extension_id": "ADT-TEST1234",
-        "user_id": "u1",
-        "is_active": True,
-        "machine_id": None,
-    })
+    mock_col.find_one = AsyncMock(return_value=None)
+    mock_col.find = MagicMock(return_value=MagicMock(to_list=AsyncMock(return_value=[])))
     mock_col.insert_one = AsyncMock(return_value=MagicMock(inserted_id="id"))
-    mock_col.count_documents = AsyncMock(return_value=5)
-    mock_col.update_one = AsyncMock(return_value=None)
-
-    mock_bp = MagicMock()
-    mock_bp.start = MagicMock()
 
     with _service_path_priority(_SERVICE_ROOT):
         with patch("shared.database.mongo.connect_mongo", AsyncMock()), \
              patch("shared.database.mongo.close_mongo", AsyncMock()), \
-             patch("shared.database.mongo.get_collection", return_value=mock_col), \
-             patch("app.services.batch_processor.BatchProcessor", return_value=mock_bp):
+             patch("shared.database.mongo.get_collection", return_value=mock_col):
             from app.main import app
             yield app
 
 
 @pytest.fixture
-async def client(telemetry_app):
+async def client(task_app):
     async with AsyncClient(
-        transport=ASGITransport(app=telemetry_app), base_url="http://test"
+        transport=ASGITransport(app=task_app), base_url="http://test"
     ) as c:
         yield c
 
 
-class TestTelemetryRoutes:
+class TestTaskRoutes:
     async def test_health_returns_200(self, client):
-        resp = await client.get("/api/v1/telemetry/health")
+        resp = await client.get("/api/v1/task/health")
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "healthy"
 
-    async def test_status_endpoint_returns_count(self, client):
-        resp = await client.get("/api/v1/telemetry/telemetry/status/ADT-TEST1234")
-        assert resp.status_code == 200
-        assert "pending_records" in resp.json()
-
-    async def test_handshake_missing_params_returns_422(self, client):
-        resp = await client.post("/api/v1/telemetry/telemetry/handshake")
+    async def test_match_missing_body_returns_422(self, client):
+        resp = await client.post("/api/v1/task/match", json={})
         assert resp.status_code == 422
 
-    async def test_ingest_missing_body_returns_422(self, client):
-        resp = await client.post("/api/v1/telemetry/telemetry/ingest", json={})
+    async def test_create_task_missing_body_returns_422(self, client):
+        resp = await client.post("/api/v1/task/create", json={})
         assert resp.status_code == 422
