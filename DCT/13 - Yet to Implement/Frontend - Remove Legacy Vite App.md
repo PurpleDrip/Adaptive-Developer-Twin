@@ -1,8 +1,9 @@
 ---
 tags: [yet-to-implement, p2, frontend]
-status: pending
+status: done
 priority: P2
 estimate: 1 hour
+completed: 2026-05-28
 ---
 
 # Frontend — Remove Legacy Vite App

@@ -1,10 +1,27 @@
 ---
 tags: [simulation-mode]
+status: phase-1-implemented
 ---
 
 # Sim Mode — Telemetry Stream
 
-## What's different from Real Mode
+## Phase 1 (self-contained) vs Phase 2 (backend-connected)
+
+### Phase 1 — no real API calls ✅
+
+In Phase 1, there are **no HTTP requests**. "Telemetry" is entirely simulated by `SimDemo.tsx`'s step runner: particles are spawned on the React state, nodes pulse visually, and skill deltas are applied directly to the `skills` SkillMap — all in JavaScript, all in the browser.
+
+There is no SHEC handshake, no `/ingest` call, no batch processor. The visual story is identical but the mechanics are local.
+
+### Phase 2 — real backend (not yet built)
+
+Phase 2 restores the original design: the Demo Driver POSTs to real telemetry services running against a sim tenant. The section below documents Phase 2 behavior for when that work begins.
+
+---
+
+## Phase 2 planned design
+
+### What's different from Real Mode
 
 | Aspect | Real | Sim |
 |:-------|:-----|:----|
@@ -13,43 +30,43 @@ tags: [simulation-mode]
 | Pings come from | VS Code extension | Embedded IDE Demo Driver |
 | Hardware lock | `vscode.env.machineId` | Hard-coded `sim-machine-001` |
 | Auth-validate | full SHA-HWID check | sim tenant has pre-locked whitelist row |
-| Snippet source | dev's real workspace | Monaco editor content |
+| Snippet source | dev's real workspace | IDE panel content |
+| API calls | real extension | `SimDemo.runStep()` |
 
-## Synthetic identity
+### Synthetic identities
 
-A handful of pre-seeded sim personas in the sim tenant:
+Pre-seeded sim personas in the sim tenant:
 
 ```json
 [
-  { "user_id": "sim-alice",   "ext_id": "sim-ext-alice",   "machine_id": "sim-machine-001", "primary_domain": "backend"  },
-  { "user_id": "sim-bob",     "ext_id": "sim-ext-bob",     "machine_id": "sim-machine-002", "primary_domain": "frontend" },
-  { "user_id": "sim-carol",   "ext_id": "sim-ext-carol",   "machine_id": "sim-machine-003", "primary_domain": "devops"   },
-  { "user_id": "sim-dee",     "ext_id": "sim-ext-dee",     "machine_id": "sim-machine-004", "primary_domain": "ml"       }
+  { "user_id": "sim-alice",  "ext_id": "sim-ext-alice",  "machine_id": "sim-machine-001", "primary_domain": "backend"  },
+  { "user_id": "sim-bob",    "ext_id": "sim-ext-bob",    "machine_id": "sim-machine-002", "primary_domain": "frontend" },
+  { "user_id": "sim-carol",  "ext_id": "sim-ext-carol",  "machine_id": "sim-machine-003", "primary_domain": "devops"   }
 ]
 ```
 
 Their `whitelist` rows are pre-populated; their THG `Developer` nodes pre-created.
 
-## Pipeline visualization triggers
+### Pipeline visualization triggers
 
-Three events the Demo Driver emits to the local sim event bus drive the pipeline panel:
+In Phase 2, `SimDemo` subscribes to WS events from Monitoring and routes them to pipeline panel state:
 
 ```ts
 type SimEvent =
-  | { type: "ping_sent", persona: string }
-  | { type: "gateway_received", persona: string }
-  | { type: "telemetry_stored", persona: string }
-  | { type: "fusion_started", persona: string, batch_id: string }
-  | { type: "fusion_completed", persona: string, batch_id: string, reliability: number }
-  | { type: "thg_updated", persona: string, skill: string, before: number, after: number }
+  | { type: "ping_sent",           persona: string }
+  | { type: "gateway_received",    persona: string }
+  | { type: "telemetry_stored",    persona: string }
+  | { type: "fusion_started",      persona: string, batch_id: string }
+  | { type: "fusion_completed",    persona: string, batch_id: string, reliability: number }
+  | { type: "thg_updated",         persona: string, skill: string, before: number, after: number }
   | { type: "dashboard_reflected", persona: string };
 ```
 
-Some come from the **client** (ping_sent — Driver emits before POST). Some come from a **WS push** from monitoring (fusion_started, thg_updated). The visualization layer subscribes to both and routes to the right pipeline node.
+Some come from the **client** (ping_sent — SimDemo emits before POST). Some come from a **WS push** from Monitoring (fusion_started, thg_updated). The simulation layer subscribes to both.
 
-## Latency faking
+### Latency faking
 
-Because sim cadence is 10 s and real cadence is 5 min, "the pipeline doing work" must visually take a beat — otherwise it looks instant. We **artificially delay** the WS pushes for the visualization (NOT the real computation):
+Because sim cadence is 10 s and real cadence is 5 min, events arrive quickly. We add visual delays so the audience can follow:
 
 ```ts
 function emitWithVisualDelay(event: SimEvent, ms = 800) {
@@ -57,23 +74,26 @@ function emitWithVisualDelay(event: SimEvent, ms = 800) {
 }
 ```
 
-So the user sees:
+Visual beat: 0s ping → 0.5s GW → 1.0s TEL → 2.0s FUS → 3.0s THG → 3.5s DASH.
 
-- 0.0s — particle leaves IDE
-- 0.5s — particle arrives at Gateway, GW pulses
-- 1.0s — particle arrives at Telemetry, TEL pulses
-- 2.0s — Fusion pulses (the "work happens" beat)
-- 3.0s — THG pulses
-- 3.5s — Dashboard radar morphs
+### Telemetry payload validity
 
-Each beat is long enough for narration but short enough to fit the demo budget.
+Sim pings must be **valid Real-Mode telemetry** — they pass the same Pydantic validators. The Demo Driver constructs payloads from the IDE's actual content:
 
-See [[Latency Faking & Heartbeats]] for the full timing table.
-
-## Telemetry payload validity
-
-Sim pings are **valid Real-Mode telemetry** — they pass the same Pydantic validators. We're not bypassing validation; we're just generating well-formed payloads.
-
-If the Real Mode validator changes, the sim Demo Driver MUST be updated too. CI test: assert that all `scripts/demo_telemetry.jsonl` fixtures parse via `TelemetryIngestDTO`.
+```ts
+const ping = {
+  extension_id: "sim-alice",
+  machine_id:   "sim-machine-001",
+  sync_type:    "DELTA",
+  wpm:          75,
+  keystrokes:   23,
+  commands_executed: 0,
+  idle_seconds: 0,
+  active_file:  currentFile,
+  languages_used: { python: 30 },
+  code_snippet: currentCode,
+  timestamp:    new Date().toISOString(),
+};
+```
 
 Tracked: [[13 - Yet to Implement/Simulation - DTO Fixture Test]].

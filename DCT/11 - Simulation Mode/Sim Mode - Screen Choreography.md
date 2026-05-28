@@ -1,119 +1,122 @@
 ---
 tags: [simulation-mode, ux]
+status: implemented
 ---
 
 # Sim Mode — Screen Choreography
 
-## The layout (1920 × 1080, designed for projection)
+## Implementation status: ✅ Done
+
+Entry: `frontend-nextjs/src/app/sim/page.tsx`
+Orchestrator: `frontend-nextjs/src/components/sim/SimDemo.tsx`
+
+---
+
+## The layout (implemented)
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│  ADT · LIVE DEMO     [persona: alice]    [▶ Play] [⏸] [⏭] [⏮]    sim badge  │
-├───────────────────┬──────────────────────────────┬───────────────────────────┤
-│                   │                              │                           │
-│   IDE (Monaco)    │   Pipeline                   │   Dashboard reflection    │
-│   ~ 38% width     │   ~ 32% width                │   ~ 30% width             │
-│                   │                              │                           │
-│   def fetch_user( │   ┌──┐    ┌──┐    ┌──┐       │   ┌─ radar ─┐             │
-│       user_id):   │   │ID│●→ │GW│●→ │TEL│       │   │ ⟨...⟩    │             │
-│     return ...    │   └──┘    └──┘    └──┘       │   │ backend  │             │
-│                   │                ↓             │   │  0.78 →  │             │
-│   class Repo:     │                              │   │  0.82 ▲  │             │
-│     ...           │              ┌──┐            │   └──────────┘             │
-│                   │              │FUS│ ⟨pulse⟩   │                           │
-│                   │              └──┘            │   What just changed:      │
-│                   │                ↓             │   • backend +0.04          │
-│                   │              ┌──┐    ┌──┐    │   • database +0.01         │
-│                   │              │THG│●→ │UI│   │                           │
-│                   │              └──┘    └──┘    │   primary driver:         │
-│                   │   "Fusion · v2.0-top-tier"   │     telemetry             │
-│                   │   "reliability: 0.94"        │   secondary:              │
-│                   │                              │     semantic snippets     │
-├───────────────────┴──────────────────────────────┴───────────────────────────┤
-│  Step 3 of 6 · Alice demonstrates backend skill via a FastAPI endpoint        │
-│  Narrator (closed captions): "Watch — as Alice types real FastAPI code, ..." │
+│  TOP BAR · ADT · LIVE DEMO  [alice · sim]  [⏮ ⏸▶ ⏭ ↻]   [SIM MODE badge]  │  52px
+├──────────────────────┬─────────────────────────────┬──────────────────────────┤
+│                      │                             │                          │
+│   IDE PANEL          │   PIPELINE PANEL            │   DASHBOARD PANEL        │
+│   38fr               │   32fr                      │   30fr                   │
+│                      │                             │                          │
+│   VS Code lookalike  │   SVG · 300×540px           │   Persona card           │
+│   Python/TS code     │   6 nodes + particles       │   Radar chart            │
+│   LIVE badge         │   Fusion label              │   Skill bars             │
+│   Status bar         │   Batch bubble              │   Ticker                 │
+│                      │                             │                          │
+├──────────────────────┴─────────────────────────────┴──────────────────────────┤
+│  BOTTOM BAR · [●●●●●●●] Step 3 of 7  Caption text  ...   ADT v1              │  56px
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
+CSS grid: `grid-template-columns: 38fr 32fr 30fr`
+
+Background: `#0d0f14` (near-black, reads well on projectors)
+
+Column dividers: `1px solid rgba(255,255,255,0.07)`
+
+## Top bar (52px)
+
+Left: ADT wordmark + gradient-text "LIVE DEMO" tag + brand logo square
+
+Center: Persona chip (pill with `● Name · sim`)
+
+Right: `⏮ ⏸/▶ ⏭ ↻` playback controls + **SIM MODE · data synthetic** gradient badge
+
+## Bottom bar (56px)
+
+Left: `Step N of 7` counter + 7 progress dots (active dot is wider, pill-shaped)
+
+Center: narrator caption at 12px `#a0a8b8`
+
+Right: `ADT v1 · Adaptive Developer Twin` credit
+
 ## Beat sheet (per step)
 
-A "step" is one scripted unit of action. The Demo Driver moves through 6 steps in a 5-minute demo.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    Note over UI: STEP BEGIN
-    UI->>UI: Caption fades in (1200ms)
-    UI->>IDE: typing begins (chars at WPM=80)
-    Note over IDE: every chunk (≈5 chars) → ping
-    IDE->>GW: ping
-    UI->>PIPE: particle leaves IDE node, travels to GW
-    UI->>PIPE: GW node pulses on arrival
-    PIPE->>TEL: particle continues
-    UI->>PIPE: TEL pulses
-    Note over TEL: sim batch fires (every 10s)
-    TEL->>FUS: signals
-    UI->>PIPE: FUS node glows + spinner
-    FUS-->>TEL: skill_updates
-    UI->>PIPE: TEL → THG particle
-    THG->>NEO: blend + decay
-    UI->>PIPE: THG node pulses
-    NEO-->>WS: skill change
-    WS-->>UI: dashboard reflection updates
-    UI->>DASH: radar morphs (350ms calm easing)
-    UI->>DASH: floating "+0.04" annotation (1200ms)
-    Note over UI: STEP END · pause for narration
-```
-
-## Motion budget
-
-| Element | Duration |
-|:--------|:--------:|
-| Caption fade in/out | 1200 ms |
-| Particle across one edge | 500 ms |
-| Node pulse | 600 ms |
-| Radar morph | 350 ms |
-| Floating annotation | 1200 ms |
-| Step gap (silence for narration) | 3000 ms |
-
-Total per step ≈ 8–10 s. Six steps ≈ 60 s of action + narration → ~5 min demo.
-
-## Captions
-
-Each step has a narrator caption (closed-caption strip at bottom):
+Steps advance automatically when `playing: true`. Between steps, `SimDemo.runStep()` awaits `step.durationMs * 0.4` before calling `runStep(idx + 1)`.
 
 ```
-Step 1: "Alice opens VS Code with the ADT extension installed. Her ext_id is locked to her machine."
-Step 2: "She starts editing a FastAPI endpoint. Her keystrokes form a snippet."
-Step 3: "Every 10 seconds (sped up from 5 minutes in prod), Telemetry batches her pings."
-Step 4: "Fusion ingests the batch. CodeBERT scores the snippet's intent — clearly backend."
-Step 5: "The Twin's backend confidence moves: 0.78 → 0.82. THG is updated."
-Step 6: "Alice's dashboard radar reflects the change in real time."
+Step 1 (5s)   — Alice opens file, IDE panel highlights
+Step 2 (12s)  — Typing + 5 pings → IDE→GW→TEL particles
+Step 3 (8s)   — Batch fires, TEL→FUS→THG particles, fusion label, skill update
+Step 4 (6s)   — THG highlighted (blend + decay narration)
+Step 5 (5s)   — DASH highlighted, radar has morphed
+Step 6 (10s)  — Bob, fraud scenario, red FUS node, THG blocked
+Step 7 (6s)   — All nodes highlighted sequentially (system integrity message)
 ```
 
-Voiceover optional — caption is the source of truth.
+## Motion budget (implemented)
 
-## Step controls
+| Element | Duration | Mechanism |
+|:--------|:--------:|:---------|
+| Particle travel (one edge) | 500ms | RAF progress 0→1 |
+| Node pulse (glow ring) | CSS border + shadow | instant on prop change |
+| Radar morph | ~350ms | recharts interpolation |
+| Skill bar width | 350ms | CSS `transition: width 350ms ease-out` |
+| Caption change | instant | no fade in Phase 1 |
+| Particle spawn to next | ~500–700ms gap | `await sleep()` in runStep |
 
-- `▶ Play` — auto-advance through all steps
-- `⏸ Pause` — freeze
-- `⏭ Next step`
-- `⏮ Previous step`
-- `↻ Restart` — back to step 1, reset radar to baseline
+## Particle system (implemented)
 
-## Pipeline visualization details
+```ts
+interface Particle {
+  id: string;         // uid()
+  from: PipelineNodeId;
+  to: PipelineNodeId;
+  progress: number;   // 0–1, advanced by RAF
+  fraud: boolean;     // blue vs red
+}
+```
 
-- **Nodes** are pill-shaped boxes with short labels: `IDE`, `Gateway`, `Telemetry`, `Fusion`, `THG`, `Dashboard`
-- **Edges** are bezier curves
-- **Particles** are small circles that travel along edges (use SVG `<animateMotion>` or a tiny canvas loop)
-- **Pulse** = scale 1 → 1.08 → 1, opacity dip, glow inset for 600 ms
-- **Stage badges** float above active nodes: "v2.0-top-tier", "reliability 0.94", "batch BATCH-..."
+`PipelinePanel` runs a `requestAnimationFrame` loop that increments `progress` by `dt / 0.5` (full traverse in 500ms) and calls `onParticleTick` to propagate to `SimDemo` state. Particle position is linear interpolation between node centers:
 
-## Sub-pages for sub-flows
+```ts
+cx = lerp(from.x, to.x, p.progress)
+cy = lerp(from.y + NODE_H/2, to.y - NODE_H/2, p.progress)
+```
 
-- [[Sim Mode - Embedded IDE Panel]] — Monaco config + typing engine
-- [[Sim Mode - Telemetry Stream]] — per-keystroke ping logic
-- [[Sim Mode - Fusion Live View]] — what we surface during the FUS pulse
-- [[Sim Mode - THG Live Update]] — graph node visualization on THG pulse
-- [[Sim Mode - Dashboard Reflection]] — the right panel
-- [[Sim Mode - Investor Script]] — the actual recipe to demo
+Particle color: brand purple (`#7c6fe0`) for normal, danger red (`#e05f5f`) for fraud.
+
+## Playback controls
+
+| Control | Behavior |
+|:--------|:---------|
+| `▶ Play` | calls `runStep(state.stepIdx)`, sets `playing: true` |
+| `⏸ Pause` | sets `stopRef.current = true`, `playing: false` |
+| `⏭ Next` | stops current step, jumps to `stepIdx + 1`, resets transient state |
+| `⏮ Prev` | same but `stepIdx - 1` |
+| `↻ Restart` | full reset to `INITIAL_STATE` |
+
+`stopRef` is a `useRef` (not state) so cancellation happens synchronously without triggering re-renders.
+
+## Sub-pages
+
+- [[Sim Mode - Embedded IDE Panel]] — custom tokenizer, typing engine
+- [[Sim Mode - Telemetry Stream]] — ping/batch logic
+- [[Sim Mode - Fusion Live View]] — SVG label implementation
+- [[Sim Mode - THG Live Update]] — skill math, ticker
+- [[Sim Mode - Dashboard Reflection]] — recharts radar
+- [[Sim Mode - Investor Script]] — the 7-step recipe

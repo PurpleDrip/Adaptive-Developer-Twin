@@ -1,57 +1,82 @@
 ---
 tags: [simulation-mode]
+status: implemented
 ---
 
 # Sim Mode — Dashboard Reflection
 
-The right-hand panel. A miniaturized [[Dashboard Layouts - Developer|Developer dashboard]] for the active persona that updates as the pipeline finishes a step.
+## Implementation status: ✅ Done
+
+File: `frontend-nextjs/src/components/sim/DashboardPanel.tsx`
+
+---
 
 ## What's in it
 
-- **Radar** (8 axes, ~280 × 280)
-- **"What just changed"** ticker — the last 3 skill changes with `±delta`
-- **Persona meta** — name, primary domain, last sync ago
-- **Influence rank** mini-card (when EVC ran)
+- **Persona card** — avatar, name, domain, "Neural Twin ● Active"
+- **Radar chart** — 8-axis recharts `RadarChart`, ~220px tall, brand purple fill
+- **Skill bars** — one bar per skill, `transition: width 350ms ease-out`
+- **"What just changed" ticker** — last 3 skill changes with before/after deltas
 
 ## Updates
 
-WS push `dashboard_reflected` arrives from Monitoring after THG completes:
+`DashboardPanel` is a pure display component — it has no local state. `SimDemo.tsx` passes `skills`, `ticker`, and `persona` as props. When `SimDemo` applies deltas and updates state, React re-renders `DashboardPanel` and the bars and radar morph.
 
-```ts
-visualizationBus.subscribe("dashboard_reflected", ({ persona, skills }) => {
-  radar.morphTo(skills, { duration: 350 });
-  ticker.prepend({ skills_changed: diff(prevSkills, skills) });
-  prevSkills = skills;
-});
+```tsx
+<DashboardPanel
+  persona={state.persona}
+  skills={state.skills}
+  ticker={state.ticker}
+/>
 ```
 
-The radar morph uses an SVG `<animate>` on each axis polygon point — `350 ms` calm easing.
+## Radar chart
 
-## Annotation float
+Uses recharts `RadarChart` (already in `package.json`), same library as the real developer dashboard:
 
-When a single skill's strength jumps notably (e.g., `+0.04`), a floating label appears next to its radar axis:
-
+```tsx
+<RadarChart cx="50%" cy="50%" outerRadius="72%" data={radarData}>
+  <PolarGrid stroke="rgba(255,255,255,0.08)" />
+  <PolarAngleAxis dataKey="subject" tick={{ fill: '#5a6480', fontSize: 9 }} />
+  <Radar name="Skills" dataKey="value"
+    stroke="#7c6fe0" fill="#7c6fe0" fillOpacity={0.22} strokeWidth={1.5} />
+</RadarChart>
 ```
-   backend
-   0.78 ─→ 0.82  +0.04
+
+The polygon morph happens automatically when `radarData` changes — recharts interpolates between old and new values. No SVG `<animate>` required.
+
+## Ticker
+
+```tsx
+{ticker.slice(0, 3).map((entry, i) => {
+  const delta = entry.after - entry.before;
+  return (
+    <div key={i}>
+      <span>{delta >= 0 ? '▲' : '▼'}</span>
+      <span>{SKILL_LABELS[entry.skill]}</span>
+      <span>{(entry.before * 100).toFixed(0)} → {(entry.after * 100).toFixed(0)}</span>
+      <span>{delta >= 0 ? '+' : ''}{(delta * 100).toFixed(0)}%</span>
+    </div>
+  );
+})}
 ```
 
-Floats up `+12 px` over `1200 ms`, fades out at the end.
+`▲` in `--brand` purple. `▼` in `--danger` red (for when decay is visualized in Phase 2).
 
-## Multi-persona switch
+## Persona switching
 
-The demo may switch personas between steps ("now let's look at Bob…"). Switching:
+When `SimDemo` switches from Alice to Bob (step 6), the `persona` prop changes. `DashboardPanel` immediately re-renders with Bob's base skills and an empty ticker. There is no fade animation in Phase 1 — the panel snaps to the new persona. Phase 2 can add a `200ms/300ms` fade.
 
-1. Fade the current radar out `200 ms`
-2. Pivot the persona name + meta
-3. Fade the next radar in `300 ms`
-4. The ticker resets — no spill of one persona's history into another's
+## Original spec vs implementation
 
-## Why "reflection"?
-
-This is the part where the cinematic story lands. We've shown the IDE, we've shown the pipeline doing work — but the audience cares about the **outcome**: did the Twin learn? The dashboard reflection answers that visibly.
+| Spec | Phase 1 | Phase 2 |
+|:-----|:--------|:--------|
+| SVG `<animate>` on radar axes | recharts interpolation ✅ | Same |
+| Floating `+0.04` annotation at axis vertex | Not built | Planned |
+| `200ms/300ms` persona fade | Instant snap | Planned |
+| WS push `dashboard_reflected` | Direct prop update | WS event |
+| Influence rank mini-card | Not built | Planned |
 
 ## Performance
 
-- Recharts can re-render at 60 fps for an 8-axis radar with morph — verified.
-- All persona switches preload textures (avatars) at step boundary to avoid layout shifts.
+recharts re-renders the 8-axis radar at 60fps. Verified via React DevTools profiler — no unexpected re-renders. The `radarData` memo in `DashboardPanel` prevents recomputing on unrelated state changes.

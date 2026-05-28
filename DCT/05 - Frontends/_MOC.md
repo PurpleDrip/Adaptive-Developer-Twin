@@ -4,20 +4,25 @@ tags: [moc, frontend]
 
 # 05 — Frontends · Map of Content
 
-ADT has two frontends:
+ADT has one active frontend:
 
-- **`frontend-nextjs/`** — the **current** Next.js 16 app. All new work goes here.
-- **`frontend/`** — the **legacy** Vite + React app. Reference only.
+- **`frontend-nextjs/`** — the Next.js 16 app. All work goes here.
+
+> ~~`frontend/`~~ — the legacy Vite + React app was **deleted on 2026-05-28**. See [[13 - Yet to Implement/Done#Frontend — Remove Legacy Vite App ✅]].
 
 ## Pages
 
 - [[Next.js App]] — overview, structure, build, deploy
-- [[Legacy Vite Frontend]] — status, what's worth salvaging
 - [[Routes - Developer]] — `/dashboard` and onboarding
 - [[Routes - Project Manager]] — `/project-manager`
 - [[Routes - Tech Admin]] — `/tech` and `/tech/dashboard`
 - [[Components Index]] — every reusable component, with purpose
 - [[State & API Client]] — how the UI talks to the backend
+
+## Simulation Mode route
+
+- **`/sim`** — investor demo. Fully self-contained, no backend needed.
+  See [[11 - Simulation Mode/_MOC]] for full documentation.
 
 ## Related
 

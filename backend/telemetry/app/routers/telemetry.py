@@ -11,13 +11,16 @@ AUTH_URL = os.getenv("AUTH_URL", "http://auth-service:8000")
 FUSION_URL = os.getenv("FUSION_URL", "http://fusion-service:8000")
 
 @router.post("/handshake")
-async def telemetry_handshake(extension_id: str, current_hash: str, machine_id: str):
+async def telemetry_handshake(extension_id: str, current_hash: str, machine_id: str, native_hwid: str | None = None):
     """
     SHEC Protocol Handshake via ExtensionID.
     """
     # 1. Resolve Identity
     async with httpx.AsyncClient() as client:
-        auth_resp = await client.post(f"{AUTH_URL}/api/v1/auth/users/validate-extension", params={"extension_id": extension_id, "machine_id": machine_id})
+        auth_resp = await client.post(
+            f"{AUTH_URL}/api/v1/auth/users/validate-extension",
+            json={"extension_id": extension_id, "machine_id": machine_id, "native_hwid": native_hwid},
+        )
         if auth_resp.status_code != 200:
             raise HTTPException(status_code=401, detail="Invalid ExtensionID")
         user_id = auth_resp.json()["user_id"]
@@ -39,7 +42,10 @@ async def ingest_telemetry(data: TelemetryIngestDTO, request: Request):
     """
     # 1. Resolve Identity & Validate Lock
     async with httpx.AsyncClient() as client:
-        auth_resp = await client.post(f"{AUTH_URL}/api/v1/auth/users/validate-extension", params={"extension_id": data.extension_id, "machine_id": data.machine_id})
+        auth_resp = await client.post(
+            f"{AUTH_URL}/api/v1/auth/users/validate-extension",
+            json={"extension_id": data.extension_id, "machine_id": data.machine_id, "native_hwid": data.native_hwid},
+        )
         if auth_resp.status_code != 200:
             raise HTTPException(status_code=401, detail="Extension ID mismatch or hardware lock violation")
         resolved_user_id = auth_resp.json()["user_id"]

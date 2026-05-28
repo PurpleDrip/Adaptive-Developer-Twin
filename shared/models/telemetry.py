@@ -17,6 +17,7 @@ class TelemetryIngestDTO(BaseModel):
     """Payload sent by VS Code extension every 30 seconds (or on handshake)."""
     extension_id: str = Field(..., min_length=1, max_length=255)
     machine_id: str = Field(..., min_length=1, max_length=255)
+    native_hwid: Optional[str] = Field(default=None, max_length=255, description="Hardware UUID from node-machine-id (P2 dual-HWID)")
     sync_type: SyncType = SyncType.DELTA
     
     # Differential Payloads
@@ -47,6 +48,7 @@ class TelemetryRawDocument:
         return {
             "extension_id": dto.extension_id,
             "machine_id": dto.machine_id,
+            "native_hwid": dto.native_hwid,
             "sync_type": dto.sync_type,
             "timestamp": dto.timestamp,
             "wpm": dto.wpm,

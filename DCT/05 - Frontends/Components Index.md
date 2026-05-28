@@ -13,9 +13,33 @@ tags: [frontend, ux]
 - **Purpose**: Big call-to-action card per role (Developer / PM / Tech)
 - **Props**: `{ role, title, description, icon, onClick }`
 
-## `ui/LoadingScreen.tsx`
+## `sim/DashboardPanel.tsx` ✅
 
-- Generic full-page loader with optional message
+- **Where**: `src/components/sim/`
+- **Used on**: `/sim`
+- **Purpose**: Right panel of the simulation screen — 8-axis radar (recharts), skill bars with animated widths, "What just changed" ticker
+- **Props**: `{ persona, skills: SkillMap, ticker: TickerEntry[] }`
+
+## `sim/IDEPanel.tsx` ✅
+
+- **Where**: `src/components/sim/`
+- **Used on**: `/sim`
+- **Purpose**: Custom VS Code dark theme editor lookalike. Shows code being typed char-by-char, LIVE ping badge, syntax highlighting (Python + TypeScript), minimap
+- **Props**: `{ fileName, code, pingFlash, isTyping, lang? }`
+
+## `sim/PipelinePanel.tsx` ✅
+
+- **Where**: `src/components/sim/`
+- **Used on**: `/sim`
+- **Purpose**: Center panel — SVG pipeline with 6 nodes (IDE→GW→TEL→FUS→THG→DASH), animated particles via RAF, Fusion result label, batch bubble, fraud-blocked THG visual
+- **Props**: `{ activeNode, particles, fusionLabel, batchBubble, onParticleTick }`
+
+## `sim/SimDemo.tsx` ✅
+
+- **Where**: `src/components/sim/`
+- **Used on**: `/sim` (page entry)
+- **Purpose**: Main orchestrator for Simulation Mode. Owns all sim state, runs the 7-step Demo Driver, handles playback controls (Play/Pause/Next/Prev/Restart), renders the 3-column layout + top/bottom bars
+- **No props** (top-level component)
 
 ## `registration/AnalysisHUD.tsx`
 
@@ -48,17 +72,20 @@ tags: [frontend, ux]
 - Color-coded action types
 - CSV export
 
+## `ui/LoadingScreen.tsx`
+
+- Generic full-page loader with optional message
+
 ## Not yet built (priority order)
 
-| Component | Used by | Owner |
+| Component | Used by | Notes |
 |:----------|:--------|:------|
 | `dashboard/SkillRadar.tsx` | `/dashboard`, `/project-manager/squad/{id}` | — |
 | `dashboard/SkillTrend.tsx` | `/dashboard` | — |
 | `pm/SquadPulseCard.tsx` | `/project-manager` | — |
 | `pm/CandidateVectorMatch.tsx` | task wizard | — |
 | `pm/InfluenceGraph.tsx` | `/project-manager/leaderboards` | uses xyflow |
-| `dev/AssessmentRunner.tsx` | `/dashboard`, blocked on Task service |
-| `sim/SimModeSwitcher.tsx` | global | — see [[11 - Simulation Mode/Mode Switcher Design]] |
-| `sim/EmbeddedIDE.tsx` | `/sim`, `/demo` | — see [[11 - Simulation Mode/Sim Mode - Embedded IDE Panel]] |
+| `dev/AssessmentRunner.tsx` | `/dashboard` | blocked on Task service |
+| `sim/SimModeSwitcher.tsx` | global | Phase 2 — see [[11 - Simulation Mode/Mode Switcher Design]] |
 
 See [[10 - UX & UI/Component Library]] for the design spec.

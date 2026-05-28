@@ -6,7 +6,7 @@ export class RegistrationView {
     private readonly _panel: vscode.WebviewPanel;
     private _disposables: vscode.Disposable[] = [];
 
-    public static render(extensionUri: vscode.Uri) {
+    public static render(extensionUri: vscode.Uri, context: vscode.ExtensionContext) {
         if (RegistrationView.currentPanel) {
             RegistrationView.currentPanel._panel.reveal(vscode.ViewColumn.One);
         } else {
@@ -16,15 +16,14 @@ export class RegistrationView {
                 vscode.ViewColumn.One,
                 {
                     enableScripts: true,
-                    localResourceRoots: [extensionUri]
+                    localResourceRoots: [extensionUri],
                 }
             );
-
-            RegistrationView.currentPanel = new RegistrationView(panel, extensionUri);
+            RegistrationView.currentPanel = new RegistrationView(panel, context);
         }
     }
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+    private constructor(panel: vscode.WebviewPanel, private readonly context: vscode.ExtensionContext) {
         this._panel = panel;
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
         this._panel.webview.html = this._getWebviewContent();
@@ -35,21 +34,20 @@ export class RegistrationView {
         RegistrationView.currentPanel = undefined;
         this._panel.dispose();
         while (this._disposables.length) {
-            const x = this._disposables.pop();
-            if (x) {
-                x.dispose();
-            }
+            this._disposables.pop()?.dispose();
         }
     }
 
     private _setWebviewMessageListener(webview: vscode.Webview) {
         webview.onDidReceiveMessage(
             async (message: any) => {
-                const { command, data } = message;
-                switch (command) {
+                switch (message.command) {
                     case 'connect':
-                        // Forward to the connection handler
-                        vscode.commands.executeCommand('adt.connectAccount', data);
+                        // Forward pre-filled data directly to connectAccount.
+                        // The handler accepts { user_id, extension_id, machine_id }.
+                        await vscode.commands.executeCommand('adt.connectAccount', message.data);
+                        // Close panel on success (the command handles error display itself)
+                        this.dispose();
                         break;
                     case 'error':
                         vscode.window.showErrorMessage(`ADT: ${message.text}`);
@@ -61,138 +59,175 @@ export class RegistrationView {
         );
     }
 
-    private _getWebviewContent() {
-        const mid = machineIdSync();
-        return `
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <style>
-                    body {
-                        background-color: #050505;
-                        color: #ffffff;
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-                        padding: 40px;
-                        display: flex;
-                        justify-content: center;
-                    }
-                    .container {
-                        max-width: 500px;
-                        width: 100%;
-                        background: rgba(255, 255, 255, 0.03);
-                        border: 1px solid rgba(255, 255, 255, 0.05);
-                        backdrop-filter: blur(20px);
-                        padding: 32px;
-                        border-radius: 16px;
-                        box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-                    }
-                    .logo-section {
-                        text-align: center;
-                        margin-bottom: 32px;
-                    }
-                    .gradient-text {
-                        background: linear-gradient(135deg, #3b82f6, #6366f1);
-                        -webkit-background-clip: text;
-                        -webkit-text-fill-color: transparent;
-                        font-size: 24px;
-                        font-weight: 800;
-                    }
-                    .input-group {
-                        margin-bottom: 20px;
-                    }
-                    label {
-                        display: block;
-                        margin-bottom: 8px;
-                        font-size: 12px;
-                        color: #a0a0a0;
-                        text-transform: uppercase;
-                        letter-spacing: 0.1em;
-                    }
-                    input, select {
-                        width: 100%;
-                        background: #161616;
-                        border: 1px solid #262626;
-                        color: white;
-                        padding: 12px;
-                        border-radius: 8px;
-                        outline: none;
-                        box-sizing: border-box;
-                    }
-                    input:focus {
-                        border-color: #3b82f6;
-                    }
-                    .btn {
-                        width: 100%;
-                        background: linear-gradient(135deg, #3b82f6, #6366f1);
-                        color: white;
-                        border: none;
-                        padding: 14px;
-                        border-radius: 8px;
-                        font-weight: 700;
-                        cursor: pointer;
-                        margin-top: 10px;
-                    }
-                    .btn:hover {
-                        opacity: 0.9;
-                    }
-                    .hardware-info {
-                        margin-top: 24px;
-                        font-size: 11px;
-                        color: #525252;
-                        text-align: center;
-                    }
-                    .machine-id {
-                        color: #3b82f6;
-                        font-family: monospace;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="logo-section">
-                        <div class="gradient-text">Connect Your Twin</div>
-                        <p style="color: #a0a0a0; font-size: 13px;">Enter your IDs from the company portal</p>
-                    </div>
-                    
-                    <div class="input-group">
-                        <label>User ID</label>
-                        <input type="text" id="userId" placeholder="usr_XXXXXX">
-                    </div>
-                    
-                    <div class="input-group">
-                        <label>Extension ID</label>
-                        <input type="text" id="extensionId" placeholder="ext_XXXXXX">
-                    </div>
+    private _getWebviewContent(): string {
+        const vscodeMid = vscode.env.machineId;
+        let nativeMid = vscodeMid;
+        try { nativeMid = machineIdSync(); } catch { /* fall back to vscode ID */ }
 
-                    <button class="btn" onclick="submit()">Link This Device</button>
+        const displayId = `${vscodeMid.slice(0, 8)}… / HW:${nativeMid.slice(0, 8)}…`;
 
-                    <div class="hardware-info">
-                        Verifying Device: <span class="machine-id">${mid.substring(0, 16)}...</span>
-                        <br>Hardware-locked to office laptop.
-                    </div>
-                </div>
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ADT Registration</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #050505;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      padding: 40px;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+      align-items: flex-start;
+    }
+    .container {
+      max-width: 480px;
+      width: 100%;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      padding: 32px;
+      border-radius: 16px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+    .logo {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .logo-title {
+      background: linear-gradient(135deg, #7c6fe0, #e05fa0);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-size: 22px;
+      font-weight: 800;
+    }
+    .logo-sub {
+      color: #6a6a8a;
+      font-size: 12px;
+      margin-top: 6px;
+    }
+    .field {
+      margin-bottom: 18px;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+    }
+    input {
+      width: 100%;
+      background: #161616;
+      border: 1px solid #2a2a2a;
+      color: #fff;
+      padding: 11px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 150ms;
+    }
+    input:focus { border-color: #7c6fe0; }
+    input::placeholder { color: #404060; }
+    .btn {
+      width: 100%;
+      background: linear-gradient(135deg, #7c6fe0, #e05fa0);
+      color: #fff;
+      border: none;
+      padding: 13px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: opacity 150ms;
+    }
+    .btn:hover { opacity: 0.88; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .hw-info {
+      margin-top: 20px;
+      font-size: 10px;
+      color: #3a3a55;
+      text-align: center;
+      line-height: 1.6;
+    }
+    .hw-id {
+      color: #5a5a80;
+      font-family: monospace;
+      font-size: 9.5px;
+    }
+    .error {
+      background: rgba(224,95,95,0.1);
+      border: 1px solid rgba(224,95,95,0.3);
+      color: #f38ba8;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12px;
+      margin-top: 12px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <div class="logo-title">Connect Your Twin</div>
+      <div class="logo-sub">Enter your IDs from the ADT company portal</div>
+    </div>
 
-                <script>
-                    const vscode = acquireVsCodeApi();
-                    function submit() {
-                        const data = {
-                            user_id: document.getElementById('userId').value,
-                            extension_id: document.getElementById('extensionId').value,
-                            machine_id: "${mid}"
-                        };
-                        
-                        if (!data.user_id || !data.extension_id) {
-                            vscode.postMessage({ command: 'error', text: 'Please enter both IDs' });
-                            return;
-                        }
-                        
-                        vscode.postMessage({ command: 'connect', data });
-                    }
-                </script>
-            </body>
-            </html>
-        `;
+    <div class="field">
+      <label>Extension ID</label>
+      <input type="text" id="extensionId" placeholder="ADT-XXXXXX" autocomplete="off">
+    </div>
+
+    <button class="btn" id="submitBtn" onclick="submit()">Link This Device</button>
+
+    <div class="error" id="errorBox"></div>
+
+    <div class="hw-info">
+      Device fingerprint:<br>
+      <span class="hw-id">${displayId}</span><br>
+      Hardware-locked — unique per physical machine.
+    </div>
+  </div>
+
+  <script>
+    const vscode = acquireVsCodeApi();
+
+    function submit() {
+      const extensionId = document.getElementById('extensionId').value.trim();
+      const errorBox = document.getElementById('errorBox');
+      const btn = document.getElementById('submitBtn');
+
+      if (!extensionId) {
+        errorBox.textContent = 'Please enter your Extension ID.';
+        errorBox.style.display = 'block';
+        return;
+      }
+
+      errorBox.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Verifying hardware lock…';
+
+      vscode.postMessage({
+        command: 'connect',
+        data: {
+          extension_id: extensionId,
+          machine_id: '${vscodeMid}',
+          native_hwid: '${nativeMid}',
+        }
+      });
+    }
+
+    document.getElementById('extensionId').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submit();
+    });
+  </script>
+</body>
+</html>`;
     }
 }

@@ -219,17 +219,22 @@ async def get_user_profile(user_id: str):
     raise HTTPException(status_code=404, detail="User not found")
 
 @router.post("/hardware-lock")
-async def hardware_lock(extension_id: str, machine_id: str):
+async def hardware_lock(extension_id: str, machine_id: str, native_hwid: Optional[str] = None):
     whitelist_col = get_collection("whitelist")
     entry = await whitelist_col.find_one({"extension_id": extension_id, "is_active": True})
     if not entry:
         raise HTTPException(status_code=401, detail="Extension ID not found")
-    
+
     if entry.get("machine_id") is None:
-        await whitelist_col.update_one({"extension_id": extension_id}, {"$set": {"machine_id": machine_id, "locked_at": datetime.utcnow()}})
+        await whitelist_col.update_one(
+            {"extension_id": extension_id},
+            {"$set": {"machine_id": machine_id, "native_hwid": native_hwid, "locked_at": datetime.utcnow()}}
+        )
+        logger.info(f"[SHA-HWID] Hardware lock established: {extension_id} -> {machine_id} (hwid={native_hwid})")
         return {"status": "locked"}
-    
+
     if entry["machine_id"] != machine_id:
+        logger.warning(f"[SHA-HWID] Hardware MISMATCH for {extension_id}: expected {entry['machine_id']}, got {machine_id}")
         raise HTTPException(status_code=403, detail="Hardware Mismatch")
     return {"status": "verified"}
 
@@ -240,6 +245,7 @@ async def validate_extension(data: dict):
     """
     extension_id = data.get("extension_id")
     machine_id = data.get("machine_id")
+    native_hwid = data.get("native_hwid")  # Optional P2 dual-HWID
     if not extension_id or not machine_id:
         raise HTTPException(status_code=400, detail="extension_id and machine_id required")
 
@@ -258,12 +264,12 @@ async def validate_extension(data: dict):
         duplicate_machine = await users_col.find_one({"machine_id": machine_id})
         if duplicate_machine:
             raise HTTPException(status_code=403, detail="Machine already anchored to another identity")
-            
-        await users_col.update_one(
-            {"extension_id": extension_id},
-            {"$set": {"machine_id": machine_id, "locked_at": datetime.utcnow()}}
-        )
-        logger.info(f"[SHA-HWID] Hardware lock established: {extension_id} -> {machine_id}")
+
+        update_fields: dict = {"machine_id": machine_id, "locked_at": datetime.utcnow()}
+        if native_hwid:
+            update_fields["native_hwid"] = native_hwid
+        await users_col.update_one({"extension_id": extension_id}, {"$set": update_fields})
+        logger.info(f"[SHA-HWID] Hardware lock established: {extension_id} -> {machine_id} (hwid={native_hwid})")
         return {"user_id": user["user_id"], "name": user["name"], "status": "LOCKED_TO_HARDWARE"}
 
     # 3. Verify existing lock

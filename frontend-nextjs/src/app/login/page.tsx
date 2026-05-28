@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LogIn, Shield, ArrowLeft, Loader2 } from 'lucide-react';
 import { authApi } from '@/lib/api/auth';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const role = searchParams.get('role') || 'developer';
@@ -22,7 +22,6 @@ export default function LoginPage() {
     try {
       const data = await authApi.login(credentials);
 
-      // Store in local storage and cookies for session persistence and middleware
       localStorage.setItem('adt_user', JSON.stringify(data));
       document.cookie = `adt_user=${encodeURIComponent(JSON.stringify(data))}; path=/; max-age=86400; SameSite=Lax`;
 
@@ -95,5 +94,13 @@ export default function LoginPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-black text-zinc-500 text-sm">Loading…</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -1,6 +1,6 @@
 ---
 tags: [yet-to-implement, p2, simulation-mode, frontend]
-status: pending
+status: partial — playback controls (Play/Pause/Next/Prev/Restart) shipped in Phase 1 as part of SimDemo.tsx. The `/sim/runner` advanced route with recipe picker + caption editor is still pending.
 priority: P2
 estimate: 3 days
 ---

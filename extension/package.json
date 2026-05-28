@@ -48,9 +48,12 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
+    "test": "node ./out/test/runTest.js",
+    "package": "npm run compile && npx @vscode/vsce package --allow-missing-repository --out ../releases/",
+    "package:pre": "npm run compile && npx @vscode/vsce package --pre-release --allow-missing-repository --out ../releases/"
   },
   "devDependencies": {
+    "@vscode/vsce": "^3.0.0",
     "@types/adm-zip": "^0.5.8",
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.1",

@@ -1,0 +1,46 @@
+# Output distribution folder (VSIX is written here — don't bundle it into itself)
+dist/**
+
+# Source files (compiled output in out/ is what runs)
+src/**
+**/*.ts
+!**/*.d.ts
+
+# Build / config artifacts
+tsconfig.json
+.eslintrc.json
+.eslintignore
+.editorconfig
+.prettierrc*
+*.config.js
+*.config.ts
+
+# Tests
+**/*.test.js
+**/*.test.ts
+**/*.spec.js
+**/*.spec.ts
+out/test/**
+
+# Dev tooling
+.vscode/**
+.vscode-test/**
+.github/**
+.git/**
+.gitignore
+.gitattributes
+
+# Docs / meta (kept: LICENSE.md, changelog.md)
+README.md
+CONTRIBUTING.md
+CHANGELOG.md
+docs/**
+
+# Source maps (not needed in production package)
+**/*.map
+
+# Misc
+.DS_Store
+Thumbs.db
+*.log
+*.tmp

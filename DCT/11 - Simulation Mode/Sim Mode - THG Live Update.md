@@ -1,51 +1,75 @@
 ---
 tags: [simulation-mode]
+status: implemented
 ---
 
 # Sim Mode — THG Live Update
 
-The "THG" pipeline node visualizes graph mutation.
+## Implementation status: ✅ Done
 
-## What's shown
+File: `frontend-nextjs/src/components/sim/PipelinePanel.tsx` (THG node)
+Skill update logic: `frontend-nextjs/src/lib/sim/demoScript.ts` → `applyDeltas()`
 
-When a skill update fires, the THG node:
+---
 
-1. Pulses
-2. Briefly expands to show a **mini graph snippet**: the affected Developer node with the touched Skill edges
-3. The touched edge's weight bar updates (e.g., `backend: 0.78 ━━━━━━━━ 0.82 ━━━━━━━━━` morph)
+## What's shown — pipeline panel
+
+The `THG` pill node in the SVG pipeline:
+
+- **Pulses** (glow ring, border turns `#7c6fe0`) when a `FUS→THG` particle arrives
+- In the **fraud scenario**, opacity drops to `0.3` and a `✕` badge renders, signalling the write was blocked
+
+The THG panel does **not** render the mini xyflow graph described in the original design spec. Phase 1 keeps it as the styled pill + glow ring to keep the panel readable at the 32% column width. The mini-graph is planned for Phase 2.
+
+## What's shown — dashboard panel
+
+The skill update is the primary payoff: `DashboardPanel.tsx` receives the updated `SkillMap` and re-renders:
+
+1. **Radar polygon** morphs — recharts re-renders with new data values; Tailwind transition on bar widths provides the 350ms ease-out
+2. **Skill bars** widen smoothly (CSS `transition: width 350ms ease-out`)
+3. **Ticker** shows the last 3 skill changes with before/after values and delta
+
+## Blend math (Phase 1)
+
+Phase 1 applies deltas as simple addition (matches the non-decay case of the real blend formula):
+
+```ts
+// demoScript.ts
+export function applyDeltas(base: SkillMap, deltas: Partial<Record<SkillName, number>>): SkillMap {
+  const result = { ...base };
+  for (const [skill, delta] of Object.entries(deltas)) {
+    result[skill as SkillName] = Math.min(1, Math.max(0, result[skill as SkillName] + delta));
+  }
+  return result;
+}
+```
+
+Phase 2 will call the real THG `/update` endpoint, which applies the Bayesian blend + temporal decay.
+
+## State flow
 
 ```
-                ┌──────────────┐
-                │ THG          │
-                │ ┌──┐         │
-                │ │AL│  ━.82━ backend  ←─ glow
-                │ └──┘  ━.34─ database
-                │       ━.55─ ml
-                └──────────────┘
+SimDemo.runStep()
+  → applyDeltas(prev.skills, step.skillDeltas)
+  → setState({ skills: newSkills, ticker: newTicker })
+  → DashboardPanel re-renders with new skills prop
 ```
 
-## Mini-graph rendering
+The ticker is prepended (new changes at top):
 
-A small `xyflow` instance inside the THG node:
+```ts
+const newTicker: TickerEntry[] = [
+  ...Object.entries(step.skillDeltas).map(([s, d]) => ({
+    skill: s as SkillName,
+    before: prev.skills[s],
+    after: prev.skills[s] + d,
+  })),
+  ...prev.ticker,
+].slice(0, 3);
+```
 
-- 1 dev node (the persona)
-- 4–6 skill nodes (the persona's top skills)
-- Edges with the strength as label
+## Real-mode comparison
 
-On update:
+Real update math: [[02 - System Architecture/Data Flow - Skill Update]] and [[07 - Algorithms/Temporal Decay Model]].
 
-- The touched edge glows for `400 ms`
-- The label transitions from `before` → `after` over `350 ms`
-- All other edges dim slightly so the eye finds the change
-
-## Multi-skill updates
-
-A single batch can touch multiple skills. The mini-graph animates them in **sequence** (50 ms apart) so the eye reads them, not as a simultaneous flash.
-
-## "Decay applied" badge
-
-If the blend formula triggered with a notable decay (e.g., last update was 2 weeks ago), show a small "↓ decay" badge briefly. Educates the audience that the math is real.
-
-## Cross-link
-
-Real-mode update math: [[02 - System Architecture/Data Flow - Skill Update#Update math]] and [[07 - Algorithms/Temporal Decay Model]].
+The numbers shown in the sim (0.78 → 0.82) are pre-tuned in `demoScript.ts` to tell a convincing story. In real mode, the same numbers emerge from the actual CodeBERT + Bayesian posterior — they just vary per developer.

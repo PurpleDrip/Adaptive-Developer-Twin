@@ -1,118 +1,105 @@
 ---
 tags: [simulation-mode, ux]
+status: implemented
 ---
 
 # Sim Mode — Embedded IDE Panel
 
-## Why Monaco
+## Implementation status: ✅ Done
 
-Monaco is the editor VS Code itself uses. Embedding it gives Sim Mode the visual authenticity of the real product — and viewers recognize it instantly.
+File: `frontend-nextjs/src/components/sim/IDEPanel.tsx`
 
-Alternatives considered:
+---
 
-- CodeMirror 6 — lighter, but less "VS-Code-shaped" visually. Use if bundle size is critical.
-- Plain `<textarea>` — kills the demo magic. Don't.
+## Why NOT Monaco (Phase 1 decision)
 
-## Setup
+The original design spec called for Monaco editor. In Phase 1 we chose a custom VS Code lookalike instead for three reasons:
 
-```ts
-import * as monaco from "monaco-editor";
+1. **No SSR complications** — Monaco requires `dynamic(() => import(...), { ssr: false })`, adding bundle complexity. Our custom div renders server-side with zero issues.
+2. **No heavy dependency** — Monaco is ~2MB. A styled `<div>` is zero bytes.
+3. **Full pixel control** — we replicate every VS Code dark UI detail we care about without fighting Monaco's theming API.
 
-const editor = monaco.editor.create(container, {
-  value: "",                       // Demo Driver fills this
-  language: "python",              // changes per step
-  theme: "vs-dark",                // align with sim chrome
-  fontSize: 14,
-  lineNumbers: "on",
-  minimap: { enabled: true },      // for visual richness
-  scrollBeyondLastLine: false,
-  automaticLayout: true,
-  readOnly: false,                 // we type into it programmatically
-});
+For investor demos, the result is visually indistinguishable. If Phase 2 needs real code editing, Monaco can be added then.
 
-editor.updateOptions({
-  cursorBlinking: "smooth",
-  cursorSmoothCaretAnimation: "on",
-});
+## Visual anatomy
+
+The panel replicates VS Code Dark+ layout:
+
+```
+┌──────────────────────────────────────────────────────┐
+│ ▌ Tab bar  ●  users.py                     [1E2030]  │  36px
+├──────────────────────────────────────────────────────┤
+│ Breadcrumb: app/routers/users.py            [171923]  │  22px
+├──────────────────────────────────────────────────────┤
+│  1  from fastapi import APIRouter, HTTPException      │
+│  2  from app.db import get_db                         │
+│  3                                                    │
+│  4  router = APIRouter()              [editor body]   │
+│  5                                                    │
+│ ...                                        [0d0f14]  │
+│                                          [minimap→]  │
+├──────────────────────────────────────────────────────┤
+│ ● live · alice@sim       Python  UTF-8  ADT Ext ✓    │  22px
+└──────────────────────────────────────────────────────┘
 ```
 
-## Programmatic typing
+- **Tab bar** (`#1E2030`): single tab, active border in `--brand` (`#7c6fe0`)
+- **Breadcrumb** (`#171923`): full file path, 11px dimmed
+- **Editor body** (`#0d0f14`): line numbers + code, `JetBrains Mono` or system fallback
+- **Minimap** (right edge, 60px): decorative only — random width bars in `rgba(255,255,255,0.04–0.12)`, enough to look plausible
+- **Status bar** (`#1a1d2e`): LIVE badge, language, encoding, extension marker
 
-The Demo Driver inserts text **one chunk at a time** to mimic real typing:
+## Syntax tokenizer
+
+`IDEPanel.tsx` ships a minimal Python/TypeScript tokenizer — no external library. It processes code line-by-line in this order:
+
+1. **Comment** (remainder of line after `#` / `//`) → `#6a9955` (VS Code green)
+2. **String literals** (`'...'`, `"..."`, backtick) → `#ce9178` (VS Code orange)
+3. **Decorator** (`@word` at line start) → `#dcdcaa` (VS Code yellow)
+4. **Keywords** (`from import def async await return if raise…`) → `#569cd6` (VS Code blue)
+5. **Everything else** → `#cdd6f4` (light grey)
+
+Sufficient for FastAPI Python and React TypeScript — the two languages in the demo script.
+
+## Typing animation
+
+`SimDemo.tsx` types text character-by-character by appending to `displayedCode` state:
 
 ```ts
-async function typeAt(editor, text, wpm = 80) {
-  const chunks = text.match(/.{1,5}/gs) || [];   // 5-char bursts
-  const msPerChunk = (60_000 / (wpm * 5)) * 5;   // wpm → ms per 5-char chunk
-  for (const c of chunks) {
-    const pos = editor.getPosition();
-    editor.executeEdits("driver", [{
-      range: new monaco.Range(pos.lineNumber, pos.column, pos.lineNumber, pos.column),
-      text: c,
-    }]);
-    editor.setPosition({ lineNumber: pos.lineNumber, column: pos.column + c.length });
-    await sleep(msPerChunk + jitter(20));
-  }
+// Inside runStep() — simplified
+for (const char of step.typedText) {
+  typed += char;
+  patch({ displayedCode: baseCode + typed });
+
+  const jitter = step.forceFraud ? 0 : (Math.random() * 40 - 20);
+  const msPerChar = 60_000 / (wpm * 5);
+  await sleep(msPerChar + jitter);
+
+  if (char === '\n') await sleep(180); // breath before newlines
 }
 ```
 
-**Jitter** (±20 ms per chunk) makes the typing feel human — a subtle but important detail. A monotonic typer reads as "machine."
+**Jitter (±20ms)** makes the typing look human. When `forceFraud=true` (Bob's scenario), jitter is set to `0` — perfectly uniform WPM — which is what Fusion's anomaly detector catches.
 
-## Per-keystroke ping
+**WPM defaults:** Alice at 75 WPM, Bob at 80 WPM (slightly faster, also suspicious for a "developer" with zero variance).
 
-After each chunk:
+## LIVE badge
 
-```ts
-async function emitPing() {
-  const snippet = editor.getModel().getValueInRange(getCursorWindow(editor, 10));
-  const lang = editor.getModel().getLanguageId();
-  await api.post("/telemetry/ingest", {
-    extension_id: "sim-alice",
-    machine_id: "sim-machine-001",
-    sync_type: "DELTA",
-    wpm: currentWpm(),
-    keystrokes: charsThisWindow,
-    commands_executed: 0,
-    idle_seconds: 0,
-    active_file: currentFile(),
-    languages_used: { [lang]: secondsThisWindow },
-    code_snippet: snippet,
-    timestamp: new Date().toISOString(),
-  });
-}
-```
+The status bar's left section shows a `●` indicator:
 
-`getCursorWindow(editor, 10)` returns the ±10 lines around the cursor — the same shape the real extension sends.
+- **Normal state:** `● live · alice@sim` in dim grey
+- **On ping emit:** badge glows `#7c6fe0` for 100ms, then fades back to grey over 600ms
 
-## Visual cues
+Implemented via `pingFlash` prop: `SimDemo` sets it `true` briefly whenever a particle is spawned, `IDEPanel` applies inline color transitions.
 
-- A **small ●** appears in the top-right of the IDE panel each time a ping leaves (fades in 100 ms, fades out 600 ms)
-- Cursor blinks
-- A subtle 1 px "live" badge at the top: `● live · alice@sim`
+## Per-keystroke pings
 
-## Switching files mid-demo
+Every ~25 characters, `SimDemo` emits a ping (spawns an `IDE→GW` particle and sets `pingFlash: true`). This corresponds to the real extension's 30-second window containing ~23 keystrokes at 75 WPM.
 
-```ts
-const FILES = [
-  { name: "app/routers/users.py", lang: "python", content: "..." },
-  { name: "components/Header.tsx", lang: "typescript", content: "..." },
-];
+## File switching
 
-function loadFile(idx: number) {
-  const f = FILES[idx];
-  const model = monaco.editor.createModel(f.content, f.lang);
-  editor.setModel(model);
-  currentFile.value = f.name;
-}
-```
+`SimDemo` sets `fileName` and `displayedCode` at step boundaries. When step 6 (Bob) loads, `IDEPanel` immediately shows the new file and filename tab. No animation — file tabs snap, they don't slide.
 
-A step can begin with "load file" then "type into it" — supporting the narration "now Alice switches to a TS file…"
+## Phase 2 upgrade path
 
-## Anti-flicker
-
-When the Demo Driver runs in autoplay, all timing comes from a single requestAnimationFrame-driven scheduler. Mixing `setTimeout` with `setInterval` causes drift visible to the audience.
-
-## Tracked
-
-- [[13 - Yet to Implement/Simulation - Embedded IDE Panel]]
-- [[13 - Yet to Implement/Simulation - Demo Driver Engine]]
+When Monaco is needed (e.g., interactive customer trials), swap `IDEPanel` for a `MonacoIDEPanel` with the same props interface. SimDemo doesn't care which editor renders the code — it just passes `displayedCode` and reads nothing back.
