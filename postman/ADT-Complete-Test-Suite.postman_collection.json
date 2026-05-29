@@ -1,0 +1,620 @@
+{
+  "info": {
+    "name": "ADT Complete Test Suite",
+    "description": "Comprehensive API tests for all 9 ADT microservices. Covers every endpoint including internal-only routes, negative cases, and chained auth flows.\n\nRun order: Auth first (populates user_id + extension_id variables), then remaining services.\n\nNewman: newman run ADT-Complete-Test-Suite.postman_collection.json -e environments/ADT-Direct-Services.postman_environment.json",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": { "method": "GET", "url": "{{AUTH_URL}}/api/v1/auth/health" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Status healthy', () => pm.expect(pm.response.json().status).to.eql('healthy'));"
+          ]}}]
+        },
+        {
+          "name": "Register Developer",
+          "request": {
+            "method": "POST",
+            "url": "{{AUTH_URL}}/api/v1/auth/users/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Test Dev\",\n  \"username\": \"postman_dev_{{$timestamp}}\",\n  \"email\": \"postman_{{$timestamp}}@test.com\",\n  \"phone_number\": \"9876543210\",\n  \"gender\": \"Male\",\n  \"experience_level\": \"Mid\",\n  \"password\": \"PostmanTest123!\",\n  \"strong_domains\": [\"backend\", \"ml\"],\n  \"github_project_urls\": []\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('Has extension_id', () => { const b = pm.response.json(); pm.expect(b.extension_id).to.match(/^ADT-/); });",
+            "pm.test('Has user_id', () => pm.expect(pm.response.json().user_id).to.be.a('string'));",
+            "const b = pm.response.json(); pm.environment.set('user_id', b.user_id); pm.environment.set('extension_id', b.extension_id);"
+          ]}}]
+        },
+        {
+          "name": "Register — Duplicate Username (Negative)",
+          "request": {
+            "method": "POST",
+            "url": "{{AUTH_URL}}/api/v1/auth/users/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Dup Dev\",\n  \"username\": \"admin\",\n  \"email\": \"admin@test.com\",\n  \"phone_number\": \"1111111111\",\n  \"gender\": \"Male\",\n  \"experience_level\": \"Mid\",\n  \"password\": \"Pass123!\",\n  \"strong_domains\": [\"backend\"],\n  \"github_project_urls\": []\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 400 or 422', () => pm.expect([400, 422]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Login — Wrong Password (Negative)",
+          "request": {
+            "method": "POST",
+            "url": "{{AUTH_URL}}/api/v1/auth/users/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"someuser_no_exist\",\n  \"password\": \"wrongpassword\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 401', () => pm.response.to.have.status(401));"
+          ]}}]
+        },
+        {
+          "name": "Login — Missing Fields (Negative)",
+          "request": {
+            "method": "POST",
+            "url": "{{AUTH_URL}}/api/v1/auth/users/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{ \"username\": \"alice\" }" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 422', () => pm.response.to.have.status(422));"
+          ]}}]
+        },
+        {
+          "name": "Get User Profile",
+          "request": { "method": "GET", "url": "{{AUTH_URL}}/api/v1/auth/users/profile/{{user_id}}" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200, 404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Get Analysis Status",
+          "request": { "method": "GET", "url": "{{AUTH_URL}}/api/v1/auth/users/analysis-status/{{user_id}}" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200, 404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Get All Users (manager role)",
+          "request": { "method": "GET", "url": "{{AUTH_URL}}/api/v1/auth/users/all" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 403', () => pm.expect([200, 403]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Validate Username Availability",
+          "request": { "method": "GET", "url": { "raw": "{{AUTH_URL}}/api/v1/auth/users/validate?username=test_unique_xyz", "query": [{"key": "username", "value": "test_unique_xyz"}] } },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Device Connect",
+          "request": {
+            "method": "POST",
+            "url": "{{AUTH_URL}}/api/v1/auth/connect/connect",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"extension_id\": \"{{extension_id}}\",\n  \"machine_id\": \"test-machine-123\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200, 403 or 404', () => pm.expect([200, 403, 404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Device Connect — Unknown Extension (Negative)",
+          "request": {
+            "method": "POST",
+            "url": "{{AUTH_URL}}/api/v1/auth/connect/connect",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"extension_id\": \"ADT-INVALID00\",\n  \"machine_id\": \"any-machine\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 403 or 404', () => pm.expect([403, 404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Send Notification",
+          "request": {
+            "method": "POST",
+            "url": "{{AUTH_URL}}/api/v1/auth/notifications/send",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"message\": \"Postman test notification\",\n  \"type\": \"info\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200, 201 or 404', () => pm.expect([200, 201, 404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Get Notifications",
+          "request": { "method": "GET", "url": "{{AUTH_URL}}/api/v1/auth/notifications/{{user_id}}" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200, 404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Admin — DB Explorer Collections",
+          "request": { "method": "GET", "url": "{{AUTH_URL}}/api/v1/auth/admin/explorer/collections" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 403', () => pm.expect([200, 403]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Admin — System Config",
+          "request": { "method": "GET", "url": "{{AUTH_URL}}/api/v1/auth/admin/config" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 403', () => pm.expect([200, 403]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Hardware Lock",
+          "request": {
+            "method": "POST",
+            "url": "{{AUTH_URL}}/api/v1/auth/users/hardware-lock",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"extension_id\": \"{{extension_id}}\",\n  \"machine_id\": \"lock-test-machine-001\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200, 404 or 409', () => pm.expect([200, 404, 409]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Validate Extension ID",
+          "request": {
+            "method": "POST",
+            "url": "{{AUTH_URL}}/api/v1/auth/users/validate-extension",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"extension_id\": \"{{extension_id}}\",\n  \"machine_id\": \"lock-test-machine-001\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200, 403 or 404', () => pm.expect([200, 403, 404]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "Telemetry Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": { "method": "GET", "url": "{{TELEMETRY_URL}}/api/v1/telemetry/health" },
+          "event": [{ "listen": "test", "script": { "exec": [ "pm.test('Status 200', () => pm.response.to.have.status(200));" ]}}]
+        },
+        {
+          "name": "Handshake — Valid",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{TELEMETRY_URL}}/api/v1/telemetry/telemetry/handshake?extension_id={{extension_id}}&current_hash=INIT&machine_id=test-machine&native_hwid=native-test",
+              "query": [
+                {"key": "extension_id", "value": "{{extension_id}}"},
+                {"key": "current_hash", "value": "INIT"},
+                {"key": "machine_id", "value": "test-machine"},
+                {"key": "native_hwid", "value": "native-test"}
+              ]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200, 403 or 404', () => pm.expect([200, 403, 404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Handshake — Missing Params (Negative)",
+          "request": { "method": "POST", "url": "{{TELEMETRY_URL}}/api/v1/telemetry/telemetry/handshake" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 422', () => pm.response.to.have.status(422));"
+          ]}}]
+        },
+        {
+          "name": "Ingest Telemetry Batch",
+          "request": {
+            "method": "POST",
+            "url": "{{TELEMETRY_URL}}/api/v1/telemetry/telemetry/ingest",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"extension_id\": \"{{extension_id}}\",\n  \"machine_id\": \"test-machine\",\n  \"native_hwid\": \"native-test\",\n  \"sync_type\": \"delta\",\n  \"wpm\": 52.3,\n  \"keystrokes\": 1240,\n  \"commands_executed\": 18,\n  \"errors_encountered\": 3,\n  \"idle_seconds\": 45.0,\n  \"copy_paste_count\": 5,\n  \"session_duration\": 1800,\n  \"code_snippets\": [],\n  \"active_file_extension\": \".ts\",\n  \"timestamp\": \"2026-05-29T10:00:00Z\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200, 201 or 403', () => pm.expect([200, 201, 403]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Ingest — Empty Body (Negative)",
+          "request": {
+            "method": "POST",
+            "url": "{{TELEMETRY_URL}}/api/v1/telemetry/telemetry/ingest",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 422', () => pm.response.to.have.status(422));"
+          ]}}]
+        },
+        {
+          "name": "Status — Pending Records",
+          "request": { "method": "GET", "url": "{{TELEMETRY_URL}}/api/v1/telemetry/telemetry/status/{{extension_id}}" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200, 404]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "Fusion Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": { "method": "GET", "url": "{{FUSION_URL}}/api/v1/fusion/health" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"]}}]
+        },
+        {
+          "name": "Analyze Text — Semantic Vector",
+          "request": {
+            "method": "POST",
+            "url": "{{FUSION_URL}}/api/v1/fusion/fusion/analyze-text",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"text\": \"Build a REST API with FastAPI and PostgreSQL for user authentication\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns vector', () => { const b = pm.response.json(); pm.expect(b).to.have.property('vector'); pm.expect(b.vector).to.be.an('object'); });"
+          ]}}]
+        },
+        {
+          "name": "Analyze Text — Empty (Negative)",
+          "request": {
+            "method": "POST",
+            "url": "{{FUSION_URL}}/api/v1/fusion/fusion/analyze-text",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 422', () => pm.response.to.have.status(422));"]}}]
+        },
+        {
+          "name": "Run Fusion for User",
+          "request": {
+            "method": "POST",
+            "url": "{{FUSION_URL}}/api/v1/fusion/fusion/{{user_id}}/run",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"telemetry_summary\": {\"wpm\": 52.3, \"keystrokes\": 1240},\n  \"resume_profile\": {},\n  \"project_profile\": {}\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200, 201 or 404', () => pm.expect([200, 201, 404]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "THG Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": { "method": "GET", "url": "{{THG_URL}}/api/v1/thg/health" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"]}}]
+        },
+        {
+          "name": "Create Developer Node",
+          "request": {
+            "method": "POST",
+            "url": "{{THG_URL}}/api/v1/thg/create-dev",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"dev_id\": \"{{user_id}}\",\n  \"name\": \"Postman Test Dev\",\n  \"bio\": \"Expert in backend\",\n  \"gender\": \"Male\",\n  \"primary_domain\": \"backend\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200, 201 or 409', () => pm.expect([200, 201, 409]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Create Developer — Missing dev_id (Negative)",
+          "request": {
+            "method": "POST",
+            "url": "{{THG_URL}}/api/v1/thg/create-dev",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Missing ID Dev\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 422', () => pm.response.to.have.status(422));"]}}]
+        },
+        {
+          "name": "Get All Developers",
+          "request": { "method": "GET", "url": "{{THG_URL}}/api/v1/thg/developers" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]}}]
+        },
+        {
+          "name": "Update Skill",
+          "request": {
+            "method": "POST",
+            "url": "{{THG_URL}}/api/v1/thg/update-skill",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"dev_id\": \"{{user_id}}\",\n  \"skill_name\": \"backend\",\n  \"strength\": 0.82,\n  \"confidence\": 0.75\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200, 404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Create Task Node",
+          "request": {
+            "method": "POST",
+            "url": "{{THG_URL}}/api/v1/thg/create-task",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"task_id\": \"TASK-PM-TEST-001\",\n  \"title\": \"Build authentication microservice\",\n  \"required_skills\": {\"backend\": 0.8, \"security\": 0.6}\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 201', () => pm.expect([200, 201]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Match Task to Developers",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{THG_URL}}/api/v1/thg/match-task?task_id=TASK-PM-TEST-001",
+              "query": [{"key": "task_id", "value": "TASK-PM-TEST-001"}]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200, 404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Create Manager Node",
+          "request": {
+            "method": "POST",
+            "url": "{{THG_URL}}/api/v1/thg/create-manager",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"manager_id\": \"MGR-TEST-001\",\n  \"name\": \"Test Manager\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200, 201 or 409', () => pm.expect([200, 201, 409]).to.include(pm.response.code));",
+            "pm.environment.set('manager_id', 'MGR-TEST-001');"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "Allocation Engine",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": { "method": "GET", "url": "{{ALLOCATION_URL}}/api/v1/allocation/health" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"]}}]
+        },
+        {
+          "name": "Rank Developers",
+          "request": {
+            "method": "POST",
+            "url": "{{ALLOCATION_URL}}/api/v1/allocation/rank",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"task_description\": \"Build a secure REST API with FastAPI, PostgreSQL, and JWT auth\",\n  \"manager_id\": \"{{manager_id}}\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200, 404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Rank — Empty Body (Negative)",
+          "request": {
+            "method": "POST",
+            "url": "{{ALLOCATION_URL}}/api/v1/allocation/rank",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 422', () => pm.response.to.have.status(422));"]}}]
+        }
+      ]
+    },
+    {
+      "name": "Analytics Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": { "method": "GET", "url": "{{ANALYTICS_URL}}/api/v1/analytics/health" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"]}}]
+        },
+        {
+          "name": "Team Skills",
+          "request": { "method": "GET", "url": "{{ANALYTICS_URL}}/api/v1/analytics/team-skills" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 500', () => pm.expect([200, 500]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Leaderboard",
+          "request": { "method": "GET", "url": "{{ANALYTICS_URL}}/api/v1/analytics/leaderboard" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 500', () => pm.expect([200, 500]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Developer Stats",
+          "request": { "method": "GET", "url": "{{ANALYTICS_URL}}/api/v1/analytics/stats/{{user_id}}" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200, 404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Submit Feedback",
+          "request": {
+            "method": "POST",
+            "url": "{{ANALYTICS_URL}}/api/v1/analytics/feedback",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reviewer_id\": \"{{user_id}}\",\n  \"target_id\": \"{{user_id}}\",\n  \"type\": \"self\",\n  \"score\": 4,\n  \"comment\": \"Postman test feedback\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200, 201 or 422', () => pm.expect([200, 201, 422]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "HR Report — Team Health",
+          "request": { "method": "GET", "url": "{{ANALYTICS_URL}}/api/v1/analytics/hr-reports/team-health" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200, 403 or 500', () => pm.expect([200, 403, 500]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Submit Weekly Test",
+          "request": {
+            "method": "POST",
+            "url": "{{ANALYTICS_URL}}/api/v1/analytics/tests/submit",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"test_id\": \"TEST-POSTMAN-001\",\n  \"answers\": [{\"question_id\": \"q1\", \"selected_option\": \"A\"}]\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200, 201, 404 or 422', () => pm.expect([200, 201, 404, 422]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "Monitoring Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": { "method": "GET", "url": "{{MONITORING_URL}}/api/v1/monitoring/health" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"]}}]
+        },
+        {
+          "name": "Get System Config",
+          "request": { "method": "GET", "url": "{{MONITORING_URL}}/api/v1/monitoring/system-config" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has batch_interval_minutes', () => pm.expect(pm.response.json()).to.have.property('batch_interval_minutes'));"
+          ]}}]
+        },
+        {
+          "name": "Update System Config",
+          "request": {
+            "method": "PUT",
+            "url": "{{MONITORING_URL}}/api/v1/monitoring/system-config",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"batch_interval_minutes\": 5,\n  \"heartbeat_interval_seconds\": 30,\n  \"is_monitoring_paused\": false\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 403', () => pm.expect([200, 403]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Audit Log",
+          "request": { "method": "GET", "url": "{{MONITORING_URL}}/api/v1/monitoring/audit-log" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]}}]
+        },
+        {
+          "name": "System Health",
+          "request": { "method": "GET", "url": "{{MONITORING_URL}}/api/v1/monitoring/system-health" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Declare Holiday",
+          "request": {
+            "method": "POST",
+            "url": "{{MONITORING_URL}}/api/v1/monitoring/holidays",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"date\": \"2026-12-25\",\n  \"name\": \"Christmas\",\n  \"applies_to\": \"all\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200, 201 or 422', () => pm.expect([200, 201, 422]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "Task Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": { "method": "GET", "url": "{{TASK_URL}}/api/v1/task/health" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"]}}]
+        },
+        {
+          "name": "Match Candidates Preview",
+          "request": {
+            "method": "POST",
+            "url": "{{TASK_URL}}/api/v1/task/match",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Build authentication service\",\n  \"description\": \"Implement JWT-based auth with FastAPI\",\n  \"required_skills\": {\"backend\": 0.8},\n  \"complexity\": 3,\n  \"manager_id\": \"{{manager_id}}\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200, 404 or 422', () => pm.expect([200, 404, 422]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Create Task",
+          "request": {
+            "method": "POST",
+            "url": "{{TASK_URL}}/api/v1/task/create",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Postman Created Task\",\n  \"description\": \"Build a Neo4j graph query service\",\n  \"required_skills\": {\"neo4j\": 0.9, \"backend\": 0.7},\n  \"complexity\": 4,\n  \"manager_id\": \"{{manager_id}}\",\n  \"assigned_to\": \"{{user_id}}\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200, 201 or 422', () => pm.expect([200, 201, 422]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Create Task — Missing Fields (Negative)",
+          "request": {
+            "method": "POST",
+            "url": "{{TASK_URL}}/api/v1/task/create",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Incomplete Task\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 422', () => pm.response.to.have.status(422));"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "Gateway",
+      "item": [
+        {
+          "name": "Gateway Health (via proxy)",
+          "request": { "method": "GET", "url": "{{GATEWAY_URL}}/api/v1/auth/health" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Proxied through gateway', () => pm.expect(pm.response.json().service).to.eql('auth-service'));"
+          ]}}]
+        },
+        {
+          "name": "CORS Preflight",
+          "request": {
+            "method": "OPTIONS",
+            "url": "{{GATEWAY_URL}}/api/v1/auth/health",
+            "header": [
+              { "key": "Origin", "value": "http://localhost:3000" },
+              { "key": "Access-Control-Request-Method", "value": "POST" }
+            ]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 204', () => pm.expect([200, 204]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "IP Block — Telemetry Ingest from External IP",
+          "request": {
+            "method": "POST",
+            "url": "{{GATEWAY_URL}}/api/v1/telemetry/telemetry/ingest",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Forwarded-For", "value": "8.8.8.8" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Blocked (403) or validation (422)', () => pm.expect([403, 422]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    }
+  ]
+}
