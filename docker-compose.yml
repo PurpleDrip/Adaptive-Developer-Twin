@@ -125,3 +125,13 @@ services:
       MONGO_URI: ${MONGO_URI}
       REDIS_URL: ${REDIS_URL}
     restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    restart: always

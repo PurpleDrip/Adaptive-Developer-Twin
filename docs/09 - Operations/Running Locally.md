@@ -32,6 +32,18 @@ cd frontend-nextjs
 npm install
 ```
 
+## Init monitoring runtime config (one-time, after first startup)
+
+The monitoring service needs a `{"_id": "global"}` document to exist before the extension's runtime config fetch works. With the backend running:
+
+```powershell
+curl -X PUT http://localhost:8007/api/v1/monitoring/system-config `
+  -H "Content-Type: application/json" `
+  -d '{"heartbeat_interval_seconds": 30, "batch_interval_minutes": 5, "is_monitoring_paused": false, "shec_handshake_interval_ms": 5000, "office_network_whitelist": ["127.0.0.1", "::1", "10.0.0.0/8"]}'
+```
+
+This is separate from the `{"key": "global_config"}` document (which is auto-seeded on startup and holds holidays/burnout config). See [[03 - Microservices/Monitoring Service#Dual system config documents]].
+
 ## Daily run
 
 ```powershell
