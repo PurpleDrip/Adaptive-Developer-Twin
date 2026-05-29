@@ -169,8 +169,14 @@ build/
 # ADT Specific
 backend/**/__pycache__/
 frontend/node_modules/
+frontend/.next/
 extension/node_modules/
 extension/out/
+extension/*.vsix
 *.log
 .DS_Store
 Thumbs.db
+
+# VS Code extension test runner (downloaded VS Code binary)
+.vscode-test/
+.vscode-test-web/
