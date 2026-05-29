@@ -1,0 +1,9 @@
+{
+  "require": ["ts-node/register", "test/setup.js"],
+  "spec": "test/unit/**/*.test.ts",
+  "timeout": 10000,
+  "reporter": "spec",
+  "env": {
+    "TS_NODE_PROJECT": "tsconfig.test.json"
+  }
+}
