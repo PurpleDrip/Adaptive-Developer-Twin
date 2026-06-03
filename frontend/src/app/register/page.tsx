@@ -141,8 +141,8 @@ export default function RegistrationPage() {
   if (step === 2) return <SuccessStep ids={ids} />;
 
   return (
-    <div className="min-h-screen py-20 px-6 bg-black flex justify-center">
-      <div className="max-w-3xl w-full p-10 glass-card animate-fade">
+    <div className="min-h-screen py-10 sm:py-20 px-4 sm:px-6 bg-black flex justify-center">
+      <div className="max-w-3xl w-full p-5 sm:p-10 glass-card animate-fade">
         <div className="flex justify-between items-center mb-8">
             <button className="btn-text !mb-0" onClick={() => router.push('/onboarding/developer')}>
                 <ArrowLeft size={16} /> Back

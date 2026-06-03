@@ -18,7 +18,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-black">
-      <header className="h-16 border-b border-zinc-800 flex items-center justify-between px-8 sticky top-0 bg-black/80 backdrop-blur-md z-30">
+      <header className="h-16 border-b border-zinc-800 flex items-center justify-between px-4 sm:px-8 sticky top-0 bg-black/80 backdrop-blur-md z-30">
         <div className="px-3 py-1 bg-green-500/10 text-green-500 text-[10px] font-bold uppercase rounded-full border border-green-500/20 flex items-center gap-2">
           <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
           Monitoring Active

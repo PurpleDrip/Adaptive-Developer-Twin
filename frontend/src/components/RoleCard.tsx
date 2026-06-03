@@ -13,7 +13,7 @@ interface RoleCardProps {
 export const RoleCard = ({ title, desc, icon, active, onClick }: RoleCardProps) => {
   return (
     <div 
-      className={`p-10 cursor-pointer transition-all duration-300 glass-card text-center flex flex-col items-center gap-4 ${
+      className={`p-6 sm:p-10 cursor-pointer transition-all duration-300 glass-card text-center flex flex-col items-center gap-4 ${
         active ? 'border-blue-500 bg-blue-500/5' : 'hover:border-blue-500/50 hover:-translate-y-1'
       }`}
       onClick={onClick}

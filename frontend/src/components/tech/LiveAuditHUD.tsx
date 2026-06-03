@@ -135,7 +135,7 @@ export const LiveAuditHUD: React.FC = () => {
                     logs.map((log) => (
                         <div key={log.id} className="p-2 rounded hover:bg-zinc-900/50 flex items-center gap-3 group border border-transparent hover:border-zinc-800 transition-all">
                             <span className="text-zinc-600 whitespace-nowrap">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                            <div className="flex items-center gap-1.5 min-w-[130px]">
+                            <div className="flex items-center gap-1.5 min-w-0 sm:min-w-[130px]">
                                 {getActionIcon(log.action)}
                                 <span className="text-blue-400 font-bold uppercase truncate">{log.action.replace(/_/g, ' ')}</span>
                             </div>

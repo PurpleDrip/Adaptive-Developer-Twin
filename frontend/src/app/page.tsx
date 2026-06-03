@@ -27,16 +27,16 @@ export default function LandingPage() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-10 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.1),transparent)]">
+    <main className="min-h-screen flex items-center justify-center p-6 sm:p-10 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.1),transparent)]">
       <div className="max-w-4xl w-full text-center animate-fade">
-        <h1 className="text-6xl font-extrabold text-blue-500 mb-2">Adaptive Developer Twin</h1>
-        <p className="text-gray-400 text-xl mb-6">Select your role to enter the ecosystem</p>
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-blue-500 mb-2">Adaptive Developer Twin</h1>
+        <p className="text-gray-400 text-base sm:text-xl mb-6">Select your role to enter the ecosystem</p>
 
         {/* Simulation Mode CTA */}
         <div className="mb-10 flex justify-center">
           <Link
             href="/sim"
-            className="inline-flex items-center gap-3 px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105"
+            className="inline-flex flex-wrap items-center justify-center gap-2 sm:gap-3 px-4 sm:px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105 max-w-full"
             style={{ background: 'linear-gradient(90deg, #7c6fe0, #e05fa0)', boxShadow: '0 0 24px rgba(124,111,224,0.35)' }}
           >
             <Play size={15} fill="currentColor" />

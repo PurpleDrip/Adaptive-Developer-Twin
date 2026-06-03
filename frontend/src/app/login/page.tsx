@@ -46,7 +46,7 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-black">
-      <div className="max-w-md w-full p-10 glass-card animate-fade text-center">
+      <div className="max-w-md w-full p-6 sm:p-10 glass-card animate-fade text-center">
         <button className="btn-text" onClick={() => router.push('/')}>
           <ArrowLeft size={16} /> Back
         </button>

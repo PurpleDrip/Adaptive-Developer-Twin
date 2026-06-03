@@ -20,7 +20,7 @@ export const SuccessStep: React.FC<SuccessStepProps> = ({ ids }) => {
 
     return (
         <div className="min-h-screen flex items-center justify-center p-6 bg-black">
-            <div className="max-w-lg w-full p-12 glass-card text-center animate-fade">
+            <div className="max-w-lg w-full p-6 sm:p-12 glass-card text-center animate-fade">
                 <div className={`mb-6 flex justify-center ${!isDone && 'animate-pulse'}`}>
                     {isDone ? (
                         <CheckCircle size={64} className="text-green-500" />

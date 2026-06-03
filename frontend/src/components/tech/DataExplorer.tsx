@@ -119,8 +119,8 @@ export const DataExplorer: React.FC = () => {
     return (
         <div className="glass-card flex flex-col border-zinc-800 h-full overflow-hidden bg-black/40">
             {/* Header / Toolbar */}
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/40 backdrop-blur-md">
-                <div className="flex items-center gap-6">
+            <div className="p-4 border-b border-zinc-800 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 bg-zinc-900/40 backdrop-blur-md">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-6">
                     {/* Collection Selector */}
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20">
@@ -140,7 +140,7 @@ export const DataExplorer: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="h-8 w-[1px] bg-zinc-800" />
+                    <div className="h-8 w-[1px] bg-zinc-800 hidden sm:block" />
 
                     {/* Filter HUD */}
                     <div className="flex items-center gap-3 bg-black/60 px-4 py-2 rounded-xl border border-zinc-800 group hover:border-zinc-700 transition-all">
@@ -166,7 +166,7 @@ export const DataExplorer: React.FC = () => {
                     </div>
                 </div>
                 
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-3 sm:gap-6">
                     <div className="text-[10px] font-mono font-bold text-zinc-600 uppercase tracking-widest">
                         {loading ? 'READING_DATA_STREAM...' : `ENTRIES_INDEXED: ${data.length}`}
                     </div>

@@ -105,8 +105,8 @@ export default function TechSupportDashboard() {
     );
 
     return (
-        <div className="min-h-screen bg-black text-white p-8 font-sans">
-            <header className="flex justify-between items-center mb-12">
+        <div className="min-h-screen bg-black text-white p-4 sm:p-8 font-sans">
+            <header className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-8 lg:mb-12">
                 <div>
                     <div className="flex items-center gap-3 mb-1">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
@@ -119,7 +119,7 @@ export default function TechSupportDashboard() {
                     </div>
                 </div>
 
-                <nav className="flex gap-1 bg-zinc-900/50 p-1 rounded-lg border border-zinc-800">
+                <nav className="flex gap-1 bg-zinc-900/50 p-1 rounded-lg border border-zinc-800 overflow-x-auto custom-scrollbar max-w-full">
                     {[
                         { id: 'infra', label: 'Infrastructure', icon: <Server size={14} /> },
                         { id: 'logs', label: 'Live Audit Logs', icon: <Activity size={14} /> },
@@ -130,7 +130,7 @@ export default function TechSupportDashboard() {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as any)}
-                            className={`px-5 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-500/20' : 'text-zinc-500 hover:text-white'}`}
+                            className={`px-4 sm:px-5 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${activeTab === tab.id ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-500/20' : 'text-zinc-500 hover:text-white'}`}
                         >
                             {tab.icon} {tab.label}
                         </button>

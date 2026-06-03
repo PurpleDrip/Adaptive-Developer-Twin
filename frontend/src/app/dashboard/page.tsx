@@ -194,7 +194,7 @@ export default function DeveloperDashboard() {
         <div className="max-w-[1400px] mx-auto space-y-6 animate-fade">
 
             {/* ── Page Header ── */}
-            <div className="flex justify-between items-start">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
                 <div>
                     <div className="flex items-center gap-2 mb-1">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
@@ -202,7 +202,7 @@ export default function DeveloperDashboard() {
                         </div>
                         <span className="text-xs text-zinc-500 font-medium">Adaptive Developer Twin</span>
                     </div>
-                    <h1 className="text-3xl font-bold text-white">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-white">
                         Welcome back, <span className="text-blue-500">{user?.name || 'Developer'}</span>
                     </h1>
                     <p className="text-sm text-zinc-500 mt-1 flex items-center gap-2">

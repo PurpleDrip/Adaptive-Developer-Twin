@@ -77,8 +77,8 @@ export const ManageDevs: React.FC = () => {
     const unassignedCount = devs.length - assignedCount;
 
     return (
-        <div className="h-full overflow-auto glass-card border-zinc-800 p-6">
-            <div className="flex justify-between items-center mb-6">
+        <div className="h-full overflow-auto glass-card border-zinc-800 p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
                 <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
                         <Users size={18} className="text-cyan-400" />
@@ -130,7 +130,7 @@ export const ManageDevs: React.FC = () => {
             ) : filteredDevs.length === 0 ? (
                 <div className="py-20 text-center text-zinc-600 text-sm">No developers match this filter.</div>
             ) : (
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[460px] text-sm">
                     <thead>
                         <tr className="text-left text-[11px] uppercase tracking-wider text-zinc-500 border-b border-zinc-800">
                             <th className="py-3 px-3 font-medium">Developer</th>

@@ -14,12 +14,12 @@ export default function DeveloperOnboarding() {
           <ArrowLeft size={16} /> Back to Role Selection
         </button>
         
-        <h2 className="text-5xl font-extrabold gradient-text mb-2">Developer Onboarding</h2>
-        <p className="text-gray-400 text-xl mb-12">Are you new here or returning to your twin?</p>
+        <h2 className="text-3xl sm:text-5xl font-extrabold gradient-text mb-2">Developer Onboarding</h2>
+        <p className="text-gray-400 text-base sm:text-xl mb-8 sm:mb-12">Are you new here or returning to your twin?</p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-2xl mx-auto">
-          <div 
-            className="p-10 cursor-pointer glass-card group hover:border-blue-500 transition-all"
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 max-w-2xl mx-auto">
+          <div
+            className="p-6 sm:p-10 cursor-pointer glass-card group hover:border-blue-500 transition-all"
             onClick={() => router.push('/login?role=developer')}
           >
             <LogIn size={48} className="text-blue-500 mb-6 mx-auto group-hover:scale-110 transition-transform" />
@@ -27,8 +27,8 @@ export default function DeveloperOnboarding() {
             <p className="text-gray-400 text-sm">Login to access your dashboard and skills graph.</p>
           </div>
 
-          <div 
-            className="p-10 cursor-pointer glass-card group hover:border-purple-500 transition-all"
+          <div
+            className="p-6 sm:p-10 cursor-pointer glass-card group hover:border-purple-500 transition-all"
             onClick={() => router.push('/register')}
           >
             <UserPlus size={48} className="text-purple-500 mb-6 mx-auto group-hover:scale-110 transition-transform" />
