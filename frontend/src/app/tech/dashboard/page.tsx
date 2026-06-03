@@ -20,6 +20,8 @@ import {
 import '@xyflow/react/dist/style.css';
 import { LiveAuditHUD } from '@/components/tech/LiveAuditHUD';
 import { DataExplorer } from '@/components/tech/DataExplorer';
+import { ManageDevs } from '@/components/tech/ManageDevs';
+import { CreateManager } from '@/components/tech/CreateManager';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
 const GATEWAY_URL = "http://127.0.0.1:8000/api/v1";
@@ -88,7 +90,7 @@ const initialEdges = [
 ];
 
 export default function TechSupportDashboard() {
-    const [activeTab, setActiveTab] = useState<'infra' | 'logs' | 'data'>('infra');
+    const [activeTab, setActiveTab] = useState<'infra' | 'logs' | 'data' | 'devs' | 'managers'>('infra');
     const [loading, setLoading] = useState(true);
     useEffect(() => {
         setTimeout(() => setLoading(false), 800);
@@ -121,7 +123,9 @@ export default function TechSupportDashboard() {
                     {[
                         { id: 'infra', label: 'Infrastructure', icon: <Server size={14} /> },
                         { id: 'logs', label: 'Live Audit Logs', icon: <Activity size={14} /> },
-                        { id: 'data', label: 'Data Vault (Explorer)', icon: <Database size={14} /> }
+                        { id: 'data', label: 'Data Vault (Explorer)', icon: <Database size={14} /> },
+                        { id: 'devs', label: 'Manage Devs', icon: <Users size={14} /> },
+                        { id: 'managers', label: 'Create Manager', icon: <UserPlus size={14} /> }
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -152,6 +156,8 @@ export default function TechSupportDashboard() {
                 )}
                 {activeTab === 'logs' && <LiveAuditHUD />}
                 {activeTab === 'data' && <DataExplorer />}
+                {activeTab === 'devs' && <ManageDevs />}
+                {activeTab === 'managers' && <CreateManager />}
             </main>
         </div>
     );

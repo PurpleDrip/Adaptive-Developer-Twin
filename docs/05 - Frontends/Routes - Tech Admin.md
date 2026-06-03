@@ -63,6 +63,34 @@ Bound to `/system-config`. Tech can:
 
 `GET /api/v1/monitoring/batch-status` — last 10 batches with status + record counts.
 
+### Tab — Manage Devs (`components/tech/ManageDevs.tsx`)
+
+Lists every developer (`GET /api/v1/auth/users/all`) alongside the name of their
+assigned manager, resolved client-side against the managers directory
+(`GET /api/v1/auth/users/managers`).
+
+- Assigned devs show the manager's name (green check).
+- **Unassigned devs show a manager dropdown** instead; selecting a manager calls
+  `POST /api/v1/auth/users/assign-manager?developer_id=&manager_id=` and updates the
+  row in place.
+- Top-right filter: **All / Assigned / Unassigned** (client-side).
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Manage Devs        [ All ][ Assigned ][ Unassigned ]  ⟳     │
+│  Developer        Squad      Manager                         │
+│  Ananya Iyer      ai         ✔ Aarav Kapoor                  │
+│  Lucas Bernardo   ai         [ Assign a manager… ▾ ]         │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Tab — Create Manager (`components/tech/CreateManager.tsx`)
+
+Form (name, username, email, phone, gender, department, password) that calls
+`POST /api/v1/auth/admin/create-manager`. The new manager is written to the
+`managers` collection with `role: "manager"` and can immediately log in and be
+selected in the Manage Devs assign dropdown.
+
 ## `/tech/data-explorer` — `components/tech/DataExplorer.tsx`
 
 > ⚠️ **This is the most powerful — and most dangerous — surface in the system.**

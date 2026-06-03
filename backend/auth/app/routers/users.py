@@ -192,6 +192,16 @@ async def get_all_users(role: str = Depends(role_required(["manager", "PM", "tec
     cursor = users_col.find({}, {"password_hash": 0, "_id": 0})
     return await cursor.to_list(length=100)
 
+@router.get("/managers")
+async def get_all_managers(role: str = Depends(role_required(["tech", "manager", "PM"]))):
+    """
+    Returns the managers directory from the isolated `managers` collection.
+    Powers the Tech dashboard's manager-name column and assign dropdown.
+    """
+    managers_col = get_collection("managers")
+    cursor = managers_col.find({}, {"password_hash": 0, "_id": 0})
+    return await cursor.to_list(length=200)
+
 @router.get("/squad/{manager_id}")
 async def get_manager_squad(manager_id: str, role: str = Depends(role_required(["manager", "PM", "tech"]))):
     """

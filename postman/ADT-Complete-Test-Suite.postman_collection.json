@@ -89,6 +89,79 @@
           ]}}]
         },
         {
+          "name": "List Managers (tech role)",
+          "request": {
+            "method": "GET",
+            "url": "{{AUTH_URL}}/api/v1/auth/users/managers",
+            "header": [{ "key": "X-User-Role", "value": "tech" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Body is an array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+            "const arr = pm.response.json(); if (Array.isArray(arr) && arr.length) { pm.environment.set('manager_id', arr[0].user_id); }"
+          ]}}]
+        },
+        {
+          "name": "List Managers — Forbidden for Developer (Negative)",
+          "request": {
+            "method": "GET",
+            "url": "{{AUTH_URL}}/api/v1/auth/users/managers",
+            "header": [{ "key": "X-User-Role", "value": "developer" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 403', () => pm.response.to.have.status(403));"
+          ]}}]
+        },
+        {
+          "name": "Create Manager (tech role)",
+          "request": {
+            "method": "POST",
+            "url": "{{AUTH_URL}}/api/v1/auth/admin/create-manager",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Role", "value": "tech" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Manager\",\n  \"username\": \"pm_mgr_{{$timestamp}}\",\n  \"email\": \"pm_mgr_{{$timestamp}}@test.com\",\n  \"phone_number\": \"9876543210\",\n  \"gender\": \"Female\",\n  \"department\": \"Backend\",\n  \"password\": \"ManagerPass123!\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('Role is manager', () => pm.expect(pm.response.json().role).to.eql('manager'));",
+            "const b = pm.response.json(); if (b.user_id) { pm.environment.set('manager_id', b.user_id); }"
+          ]}}]
+        },
+        {
+          "name": "Create Manager — Missing Department (Negative)",
+          "request": {
+            "method": "POST",
+            "url": "{{AUTH_URL}}/api/v1/auth/admin/create-manager",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Role", "value": "tech" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Bad Manager\",\n  \"username\": \"bad_mgr_{{$timestamp}}\",\n  \"email\": \"bad_mgr_{{$timestamp}}@test.com\",\n  \"phone_number\": \"9876543210\",\n  \"gender\": \"Male\",\n  \"password\": \"ManagerPass123!\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 422', () => pm.response.to.have.status(422));"
+          ]}}]
+        },
+        {
+          "name": "Assign Manager to Developer",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{AUTH_URL}}/api/v1/auth/users/assign-manager?developer_id={{user_id}}&manager_id={{manager_id}}",
+              "query": [
+                { "key": "developer_id", "value": "{{user_id}}" },
+                { "key": "manager_id", "value": "{{manager_id}}" }
+              ]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Status success', () => pm.expect(pm.response.json().status).to.eql('success'));"
+          ]}}]
+        },
+        {
           "name": "Validate Username Availability",
           "request": { "method": "GET", "url": { "raw": "{{AUTH_URL}}/api/v1/auth/users/validate?username=test_unique_xyz", "query": [{"key": "username", "value": "test_unique_xyz"}] } },
           "event": [{ "listen": "test", "script": { "exec": [

@@ -3,7 +3,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..
 
 import pytest
 from pydantic import ValidationError
-from shared.models.user import UserRegistrationDTO, LoginDTO
+from shared.models.user import UserRegistrationDTO, LoginDTO, ManagerCreateDTO
 
 pytestmark = pytest.mark.unit
 
@@ -46,3 +46,48 @@ class TestLoginDTO:
     def test_missing_password_raises(self):
         with pytest.raises(ValidationError):
             LoginDTO(username="alice")
+
+
+class TestManagerCreateDTO:
+    VALID = {
+        "name": "Nora Manager",
+        "username": "nora.manager",
+        "email": "Nora.Manager@ADT.ai",
+        "phone_number": "9876543210",
+        "gender": "Female",
+        "department": "Backend",
+        "password": "SecurePass123!",
+    }
+
+    def test_valid_manager_passes_and_lowercases_email(self):
+        dto = ManagerCreateDTO(**self.VALID)
+        assert dto.username == "nora.manager"
+        assert dto.email == "nora.manager@adt.ai"
+        assert dto.department == "Backend"
+
+    def test_missing_department_raises(self):
+        data = {**self.VALID}
+        del data["department"]
+        with pytest.raises(ValidationError):
+            ManagerCreateDTO(**data)
+
+    def test_missing_email_raises(self):
+        data = {**self.VALID}
+        del data["email"]
+        with pytest.raises(ValidationError):
+            ManagerCreateDTO(**data)
+
+    def test_invalid_gender_raises(self):
+        data = {**self.VALID, "gender": "Robot"}
+        with pytest.raises(ValidationError):
+            ManagerCreateDTO(**data)
+
+    def test_short_password_raises(self):
+        data = {**self.VALID, "password": "short"}
+        with pytest.raises(ValidationError):
+            ManagerCreateDTO(**data)
+
+    def test_invalid_email_format_raises(self):
+        data = {**self.VALID, "email": "not-an-email"}
+        with pytest.raises(ValidationError):
+            ManagerCreateDTO(**data)

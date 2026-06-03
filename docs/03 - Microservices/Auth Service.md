@@ -35,7 +35,8 @@ aliases: [Auth]
 | POST | `/save-session` | `save_reg_session(session_id, data)` | Stash partial registration in Redis 24h |
 | GET | `/get-session/{session_id}` | `get_reg_session(session_id)` | Retrieve from Redis |
 | GET | `/validate?field=&value=` | `validate_field(field, value)` | Uniqueness pre-check |
-| GET | `/all` (role-gated) | `get_all_users()` | Directory |
+| GET | `/all` (role-gated) | `get_all_users()` | Directory (developers) |
+| GET | `/managers` (role-gated: tech/manager/PM) | `get_all_managers()` | Managers directory from `managers` collection (powers Tech dashboard name column + assign dropdown) |
 | GET | `/squad/{manager_id}` (role-gated) | `get_manager_squad(manager_id)` | Squad members |
 | GET | `/profile/{user_id}` | `get_user_profile(user_id)` | Polymorphic lookup |
 | POST | `/hardware-lock` | `hardware_lock(ext_id, machine_id)` | First-time bind or verify |
@@ -46,7 +47,7 @@ aliases: [Auth]
 
 | Method | Path | Handler | Purpose |
 |:-------|:-----|:--------|:--------|
-| POST | `/create-manager` | `create_manager(AdminCreateAccountDTO)` | Tech creates manager + THG node |
+| POST | `/create-manager` | `create_manager(ManagerCreateDTO)` | Tech creates a manager in the **`managers`** collection (`role: "manager"`, generated `mgr_<hex>` id) + THG node |
 | POST | `/create-account` | `create_admin_account(AdminCreateAccountDTO)` | Tech creates HRM/Senior Dev |
 | GET | `/explorer/collections` | `list_collections()` | Mongo collection names |
 | GET | `/explorer/{collection}?limit&skip&filter_key&filter_val` | `get_collection_data(...)` | Browse any collection |
@@ -142,13 +143,13 @@ Tracked:
 **Test location:** `backend/auth/test/`
 
 ### Unit tests (`pytest -m unit`)
-- `test/unit/test_models.py` — `UserRegistrationDTO` and `LoginDTO` field validation, missing required fields, type coercion
+- `test/unit/test_models.py` — `UserRegistrationDTO`, `LoginDTO`, and `ManagerCreateDTO` field validation, missing required fields, email lower-casing, invalid gender/password, type coercion
 
 ### Integration tests (`pytest -m integration`)
-- `test/integration/test_routes.py` — all routes tested with FastAPI `AsyncClient`; DB mocked, no live MongoDB required
+- `test/integration/test_routes.py` — all routes tested with FastAPI `AsyncClient`; DB mocked, no live MongoDB required. Covers `GET /managers` (200 + role-gating 403), `POST /create-manager` (201, 400 duplicate, 422 missing field, 403 wrong role), and `POST /assign-manager` (success). THG/httpx calls are mocked so no network is hit.
 
 ### Postman
-All auth endpoints are in the **Auth Service** folder of `postman/ADT-Complete-Test-Suite.postman_collection.json`, including negative cases for duplicate registration, wrong password, and missing fields.
+All auth endpoints are in the **Auth Service** folder of `postman/ADT-Complete-Test-Suite.postman_collection.json`, including negative cases for duplicate registration, wrong password, and missing fields, plus **List Managers**, **Create Manager** (+ missing-field negative), and **Assign Manager** (each sends `X-User-Role: tech` where role-gated).
 
 ### Known edge cases surfaced during testing
 - Password is bcrypt-hashed at 72-byte limit; passwords longer than 72 bytes produce identical hashes — no validation enforced at the API layer

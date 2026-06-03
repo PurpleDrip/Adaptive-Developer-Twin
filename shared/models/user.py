@@ -86,3 +86,21 @@ class AdminCreateAccountDTO(BaseModel):
     gender: str
     password: str
     role: str = Field(..., pattern=r'^(senior_manager|hrm|tech_support)$')
+
+class ManagerCreateDTO(BaseModel):
+    """Payload for Tech Support to create a Manager account (managers collection)."""
+    name: str = Field(..., min_length=2, max_length=100)
+    username: str = Field(..., min_length=3, max_length=50, pattern=r'^[a-zA-Z0-9_.]+$')
+    email: str = Field(..., max_length=255)
+    phone_number: str = Field(..., min_length=10, max_length=15)
+    gender: str = Field(..., pattern=r'^(Male|Female|Other)$')
+    department: str = Field(..., min_length=1, max_length=50)
+    password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v):
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(pattern, v):
+            raise ValueError('Invalid email format')
+        return v.lower()

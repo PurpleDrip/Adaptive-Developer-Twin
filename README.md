@@ -214,6 +214,8 @@ Infrastructure command centre:
 - MongoDB data explorer with edit capability
 - System health across all 9 services
 - Runtime config editor (heartbeat interval, IP whitelist, pause monitoring)
+- **Manage Devs** — list all developers with their assigned manager; assign a manager to unassigned devs via a dropdown; filter by All / Assigned / Unassigned
+- **Create Manager** — provision a new manager account directly into the `managers` collection
 
 ---
 

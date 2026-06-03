@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, Dict
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
-from shared.models.user import AdminCreateAccountDTO, UserDocument
+from shared.models.user import AdminCreateAccountDTO, ManagerCreateDTO, UserDocument
 from shared.database.mongo import get_collection
 from passlib.context import CryptContext
 
@@ -16,45 +16,48 @@ router = APIRouter(dependencies=[Depends(role_required(["tech"]))])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 @router.post("/create-manager", status_code=201)
-async def create_manager(dto: AdminCreateAccountDTO):
+async def create_manager(dto: ManagerCreateDTO):
     """
-    Tech Support creates a Manager account and syncs it to the Graph.
+    Tech Support creates a Manager account in the canonical `managers` collection
+    and syncs it to the Graph. Managers live in an isolated collection (this is
+    where login and profile lookups resolve role="manager").
     """
-    users_col = get_collection("users")
-    
-    # 1. Mongo Registration
-    existing = await users_col.find_one({"$or": [{"username": dto.username}, {"email": dto.email}]})
+    managers_col = get_collection("managers")
+
+    # 1. Mongo Registration (managers collection)
+    existing = await managers_col.find_one({"$or": [{"username": dto.username}, {"email": dto.email}]})
     if existing:
         raise HTTPException(status_code=400, detail="Username or email already exists")
-    
-    user_id = str(uuid.uuid4())
-    user_doc = {
+
+    user_id = f"mgr_{uuid.uuid4().hex[:12]}"
+    manager_doc = {
         "user_id": user_id,
         "name": dto.name,
         "username": dto.username,
         "email": dto.email,
         "phone_number": dto.phone_number,
         "gender": dto.gender,
+        "department": dto.department,
         "password_hash": pwd_context.hash(dto.password),
-        "role": dto.role,
+        "role": "manager",
         "registered_at": datetime.utcnow(),
         "is_active": True
     }
-    await users_col.insert_one(user_doc)
-    
-    # 2. Sync to Neo4j (THG)
+    await managers_col.insert_one(manager_doc)
+
+    # 2. Sync to Neo4j (THG) — best effort
     THG_URL = os.getenv("THG_URL", "http://thg-service:8000")
     try:
         async with httpx.AsyncClient() as client:
             await client.post(f"{THG_URL}/api/v1/thg/thg/create-manager", json={
-                "dev_id": user_id, # Reusing DTO structure
+                "dev_id": user_id,  # THG endpoint reuses the dev field name
                 "name": dto.name,
                 "primary_domain": "management"
             })
     except Exception as e:
         print(f"THG Manager Sync failed: {e}")
 
-    return {"status": "created", "user_id": user_id, "role": dto.role}
+    return {"status": "created", "user_id": user_id, "role": "manager"}
 
 @router.post("/create-account", status_code=201)
 async def create_admin_account(dto: AdminCreateAccountDTO):
